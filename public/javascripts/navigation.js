@@ -2,7 +2,7 @@
 
 var X = 500;
 var Y = 350;
-var s = 4d;
+var s = 4;
 var action = 0;
 gameplay = true;
 const vWidth = 1100;
