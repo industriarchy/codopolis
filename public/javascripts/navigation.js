@@ -2,7 +2,7 @@
 
 var X = 500;
 var Y = 350;
-var s = 5;
+var s = 4d;
 var action = 0;
 gameplay = true;
 const vWidth = 1100;
@@ -14,6 +14,7 @@ var dude = new Image();
 var c;
 var ctx;
 var flipped = false;
+var timeSet = Date.now();
 
 initiateMap();
 var socket = io();
@@ -35,26 +36,28 @@ $( function() {
 });
 
 function render() {
+  var timeDif = Date.now() - timeSet;
+  timeSet = Date.now();
   switch(action) {
     case 1:
       if(canGo(X, Y-s)) {
-        Y-=s;
+        Y-=timeDif/s;
       }
       break;
     case 2:
       if(canGo(X, Y+s)) {
-        Y+=s;
+        Y+=timeDif/s;
       }
       break;
     case 3:
       if(canGo(X-s, Y)) {
-        X-=s;
+        X-=timeDif/s;
         flipped = true;
       }
       break;
     case 4:
       if(canGo(X+s, Y)) {
-        X+=s;
+        X+=timeDif/s;
         flipped = false;
       }
       break;
@@ -102,15 +105,14 @@ function drawMap() {
     if(outsideData.units != null) {
       var keys = Object.keys(outsideData.units);
       for(var i=0;i<keys.length;i++){
+        if(keys[i] != id) {
           var key = keys[i];
-          // console.log(key, outsideData.units[key].x);
-          // console.log(X);
           ctx.drawImage(dude, outsideData.units[key].x - X + 500, outsideData.units[key].y - Y + 350, 100, 100);
+        }
       }
     }
   }
-  // console.log(outsideData);
-  // ctx.drawImage(dude, cX, cY, 100, 100);
+  ctx.drawImage(dude, cX, cY, 100, 100);
 }
 
 function drawDude(x, y) {
@@ -178,33 +180,20 @@ function colorMap(callback) {
   callback();
 }
 
-function initiateDomMap(callback) {
-  for(let i=0; i<(rows); i++) {
-    for(let j=0; j<(columns); j++) {
-      var element = document.createElement("div");
-      element.id= "x" + i + "y" + j;
-      element.className = "mapBlock";
-      var blah = document.getElementById("theMap").appendChild(element);
-      // console.log(blah);
-    }
-  }
-  callback();
-}
-
 document.addEventListener('keydown', (event) => {
   const keyName = event.key;
   if(action == 0) {
     switch(keyName) {
-      case "ArrowUp":
+      case "w":
         goUp();
         break;
-      case "ArrowDown":
+      case "s":
         goDown();
         break;
-      case "ArrowRight":
+      case "d":
         goRight();
         break;
-      case "ArrowLeft":
+      case "a":
         goLeft();
         break;
     };

@@ -20,8 +20,6 @@ io.on('connection', function(socket){
   });
   numConnected++;
   socket.on('disconnect', function(){
-    console.log('user disconnected');
-
     numConnected--;
   });
 });
