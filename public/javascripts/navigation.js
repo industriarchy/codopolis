@@ -25,6 +25,7 @@ $( function() {
   id = docCookies.getItem('userId');
   socket.on('chat message', function(msg){
       outsideData = msg;
+      console.log(msg);
       drawMap();
   });
   c = document.getElementById("theView");
