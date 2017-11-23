@@ -11,24 +11,27 @@ var numConnected = 0;
 var alreadySending = false;
 
 //  ------------------ mapData Format  ----------------------
-//  curId: int    -> specifies the next id to be created by new player
+//  curId: int          -> specifies the next id to be created by new player
 //  units: {
-//   id: {        -> id of the units
-//      x: int    -> x-coord of unit
-//      y: int    -> y-coord of unit
-//    },
-//  },
-//  missles: {
-//    id:  {      -> id of missle
-//      ownId: int -> id of owner
-//      curX: int -> current x-coord
-//      curY: int -> current y-coord
-//      tarX: int -> target x-coord
-//      tarY: int -> target y-coord
-//      type: string -> projectile type
+//   id: {              -> id of the units
+//      x: int          -> x-coord of unit
+//      y: int          -> y-coord of unit
+//      ll: bool        -> var for looking right
+//      missles: {
+//        id: { int     -> id of missle
+//          curX: int   -> current x-coord
+//          curY: int   -> current y-coord
+//          dX: int     -> travel speed x
+//          dY: int     -> travel speed y
+//          dist: int   -> distance traveled so far
+//          type: string -> projectile type
+//        },
+//      }
 //    },
 //  }
 //  ----------------------------------------------------------
+
+// Need to make map work on server rendering
 
 var mapData = {
   curId: 0,
@@ -37,9 +40,12 @@ var mapData = {
 };
 
 io.on('connection', function(socket){
-  socket.on('chat message', function(msg){
-    mapData.units[msg.id] = msg;
-    // io.emit('chat message', mapData);
+  socket.on('appData', function(msg){
+    if(mapData.units[msg.unit.id] == null) {
+      mapData.units[msg.unit.id] = msg.unit;
+    }
+    mapData.units[msg.unit.id].up= msg.unit.up;
+    mapData.units[msg.unit.id].right = msg.unit.right;
   });
   numConnected++;
   socket.on('disconnect', function(){
@@ -53,10 +59,40 @@ io.on('connection', function(socket){
 function batchSend(socket) {
   if(!alreadySending) {
     setInterval(() => {
-      if(numConnected > 0)
-        io.emit('chat message', mapData);
+      if(numConnected > 0) {
+        processData();
+        io.emit('appData', mapData);
+      };
     }, 30);
     alreadySending = true;
+  }
+}
+
+function processData() {
+  if(mapData.units != null) {
+    var keys = Object.keys(mapData.units);
+    for(var i=0;i<keys.length;i++){
+      var key = keys[i];
+
+      // Process units
+      mapData.units[key].x += mapData.units[key].right;
+      mapData.units[key].y -= mapData.units[key].up;
+
+      // Process Missles
+      if(mapData.units[key].missles != null) {
+        var keys2 = Object.keys(mapData.units[key].missles);
+        for(let j=0;j<keys2.length;j++) {
+          var key2 = keys2[j];
+          var missle = mapData.units[key].missles[key2];
+          mapData.units[key].missles[key2].curX = missle.curX + missle.dx;
+          mapData.units[key].missles[key2].curY = missle.curY + missle.dy;
+          mapData.units[key].missles[key2].dist++;
+          if( mapData.units[key].missles[key2].dist > 30 ) {
+            delete mapData.units[key].missles[key2];
+          }
+        }
+      }
+    }
   }
 }
 
