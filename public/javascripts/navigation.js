@@ -1,5 +1,3 @@
-
-
 var X = 500;
 var Y = 350;
 var s = 5;
@@ -26,19 +24,22 @@ var socket = io();
 var id;
 var data;
 var outsideData;
+var missles = {};
 
 
 $( function() {
   id = docCookies.getItem('userId');
   socket.on('appData', function(msg){
+    // console.log(msg);
     if(needsReset) {
       resetLoc();
     }
-    data = { unit: {id: id, x: X, y: Y, ll: flipped, up: act.up, right: act.right}};
+    data = { unit: {id: id, x: X, y: Y, ll: flipped, up: act.up, right: act.right, missles: missles}};
     socket.emit('appData', data);
+    clearData();
     outsideData = msg;
-    drawMap();
     render();
+    drawMap();
   });
   c = document.getElementById("theView");
   ctx = c.getContext("2d");
@@ -49,12 +50,16 @@ $( function() {
 
 function resetLoc() {
   if(outsideData != null) {
-    if(outsideData.units != null) {
+    if(outsideData.units[id] != null) {
       X = outsideData.units[id].x;
       Y = outsideData.units[id].y;
       needsReset = false;
     }
   }
+}
+
+function clearData() {
+  missles = {};
 }
 
 function render() {
@@ -84,7 +89,6 @@ function render() {
 
   if(act.up != 0 || act.right != 0) {
     ctx.clearRect(0, 0, vWidth, vHeight); // clear canvas
-    drawMap();
   }
 }
 
@@ -114,31 +118,7 @@ function drawMap() {
     }
   }
 
-  // Draw the Outside Data
-  if(outsideData != null) {
-
-    // Draw the Players
-    if(outsideData.units != null) {
-      var keys = Object.keys(outsideData.units);
-      for(var i=0;i<keys.length;i++){
-        if(keys[i] != id) {
-          var key = keys[i];
-          if(outsideData.units[key].ll) {
-            ctx.drawImage(fDude, outsideData.units[key].x - X + 500, outsideData.units[key].y - Y + 350, 100, 100);
-          }
-          else {
-            ctx.drawImage(dude, outsideData.units[key].x - X + 500, outsideData.units[key].y - Y + 350, 100, 100);
-          }
-        }
-      }
-    }
-  }
-  if(flipped) {
-    ctx.drawImage(fDude, cX, cY, 100, 100);
-  }
-  else {
-    ctx.drawImage(dude, cX, cY, 100, 100);
-  }
+  drawData();
 }
 
 function grassTile(x, y) {
@@ -157,6 +137,48 @@ function grassTile(x, y) {
 function wallTile(x, y) {
   ctx.fillStyle = '#aaa';
   ctx.fillRect(x, y,100, 100);
+}
+
+function drawData() {
+  // Draw the Outside Data
+  if(outsideData != null) {
+
+    // Draw the Players
+    if(outsideData.units != null) {
+      var keys = Object.keys(outsideData.units);
+      for(var i=0;i<keys.length;i++){
+        var key= keys[i];
+        if(key != id) {
+          if(outsideData.units[key].ll) {
+            ctx.drawImage(fDude, outsideData.units[key].x - X + 500, outsideData.units[key].y - Y + 350, 100, 100);
+          }
+          else {
+            ctx.drawImage(dude, outsideData.units[key].x - X + 500, outsideData.units[key].y - Y + 350, 100, 100);
+          }
+        }
+        // draw the projectiles
+        if(outsideData.units[key].missles != null) {
+          var keys2 = Object.keys(outsideData.units[key].missles);
+          for(var j=0;j<keys2.length;j++){
+            key2 = keys2[j];
+            console.log(outsideData.units[key].missles[key2]);
+            let missle = outsideData.units[key].missles[key2];
+            ctx.beginPath();
+            ctx.arc(missle.curX, missle.curY, 5, 0, 2 * Math.PI, false);
+            ctx.fillStyle = 'green';
+            ctx.fill();
+            ctx.stroke();
+          }
+        }
+      }
+    }
+  }
+  if(flipped) {
+    ctx.drawImage(fDude, cX, cY, 100, 100);
+  }
+  else {
+    ctx.drawImage(dude, cX, cY, 100, 100);
+  }
 }
 
 function leftBound() {
@@ -253,6 +275,47 @@ document.addEventListener('click', (event) => {
 });
 
 function shoot(x2, y2) {
-  console.log(x2 + ", " + y2);
+  diff = unit(500, 350, x2, y2);
+  let i=0;
+  let aMissle = {
+   curX: X,
+   curY: Y,
+   dX: diff.x * 5,
+   dY: diff.y * 5,
+   dist: 0,
+   type: "A",
+   shooting: true
+  };
+
+ // console.log(outsideData.units[id]);
+ // if(outsideData.units[id].missles != null && outsideData.units[id].missles != undefined) {
+ //   console.log(outsideData.units[id].missles);
+ //   while(outsideData.units[id].missles[i] != null) {
+ //     i++;
+ //   }
+ // }
+ // else {
+ //   outsideData.units[id].missles = {};
+ // }
+ // outsideData.units[id].missles[i] = aMissle;
+ // console.log(outsideData.units[id]);
+ if(missles[1] == undefined) {
+   missles[1] = aMissle;
+  }
 
 };
+
+// Some basic utility functions
+
+function dist(x1, y1, x2, y2) {
+  return (Math.hypot(x2-x1, y2-y1))
+}
+
+function unit(x1, y1, x2, y2) {
+  let d = dist(x1, y1, x2, y2);
+  var dir = {
+    x: (x2 - x1)/d,
+    y: (y2 - y1)/d
+  }
+  return dir;
+}
