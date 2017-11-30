@@ -18,23 +18,37 @@ var ctx;
 var flipped = false;
 var timeSet = Date.now();
 var needsReset = true;
-
-initiateMap();
+var MAP;
+var columns;
+var rows;
+var unitWidth = 60;
+var unitHeight = 100;
 var socket = io();
 var id;
 var data;
 var outsideData;
 var missles = {};
+var hits = {};
+var hitsF = {sender: 0, missle: 0, unit: 0};
 
 
 $( function() {
   id = docCookies.getItem('userId');
+  MAP = docCookies.parseMap(docCookies.getItem('MAP'));
+  columns = MAP.length;
+  rows = MAP[0].length;
+
   socket.on('appData', function(msg){
-    // console.log(msg);
+    //reset if dead
+    if(msg.units[id].alive == false) {
+      X = msg.units[id].x;
+      Y = msg.units[id].y;
+    }
     if(needsReset) {
       resetLoc();
     }
-    data = { unit: {id: id, x: X, y: Y, ll: flipped, up: act.up, right: act.right, missles: missles}};
+    data = { unit: {id: id, x: X, y: Y, ll: flipped, up: act.up, right: act.right,
+       missles: missles, alive: true}, hits: hits};
     socket.emit('appData', data);
     clearData();
     outsideData = msg;
@@ -127,10 +141,7 @@ function grassTile(x, y) {
   ctx.beginPath();
   ctx.moveTo(x+10, y+10);
   ctx.lineTo(x+20, y+30);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x+30, y+10);
-  ctx.lineTo(x+20, y+30);
+  ctx.lineTo(x+30, y+10);
   ctx.stroke();
 }
 
@@ -155,21 +166,42 @@ function drawData() {
           else {
             ctx.drawImage(dude, outsideData.units[key].x - X + 500, outsideData.units[key].y - Y + 350, 100, 100);
           }
+          ctx.fillStyle = '#a32';
+          ctx.fillRect(outsideData.units[key].x+24 - X + 500,outsideData.units[key].y-15 - Y + 350,outsideData.units[key].health/2, 5);
         }
-        // draw the projectiles
-        if(outsideData.units[key].missles != null) {
-          var keys2 = Object.keys(outsideData.units[key].missles);
-          for(var j=0;j<keys2.length;j++){
-            key2 = keys2[j];
-            console.log(outsideData.units[key].missles[key2]);
-            let missle = outsideData.units[key].missles[key2];
-            ctx.beginPath();
-            ctx.arc(missle.curX, missle.curY, 5, 0, 2 * Math.PI, false);
-            ctx.fillStyle = 'green';
-            ctx.fill();
-            ctx.stroke();
+
+        //Check for hit
+        var myMissles = outsideData.missles;
+        hits = {};
+        if(myMissles != null && key != id) {
+          var keys2 = Object.keys(myMissles);
+          for(var j=0; j<keys2.length; j++) {
+            var key2 = keys2[j];
+
+            // Need to actually run a validate here
+            if(myMissles[key2].curX != null) {
+              if(hitUnit(myMissles[key2].curX, myMissles[key2].curY, key)) {
+                // need to send hit
+                hits = {sender: id, missle: key2, unit: key};
+              }
+            }
           }
         }
+
+      }
+    }
+
+    // draw the projectiles
+    if(outsideData.missles != null) {
+      var keys = Object.keys(outsideData.missles);
+      for(var j=0;j<keys.length;j++){
+        key = keys[j];
+        let missle = outsideData.missles[key];
+        ctx.beginPath();
+        ctx.arc(missle.curX - X + 500, missle.curY - Y + 350, 5, 0, 2 * Math.PI, false);
+        ctx.fillStyle = 'black';
+        ctx.fill();
+        ctx.stroke();
       }
     }
   }
@@ -179,6 +211,24 @@ function drawData() {
   else {
     ctx.drawImage(dude, cX, cY, 100, 100);
   }
+  // draw health
+  ctx.fillStyle = '#a32';
+  ctx.fillRect(cX+24,cY-15,outsideData.units[id].health/2, 5);
+}
+
+function hitUnit(x, y, unit) {
+  var xMin = outsideData.units[unit].x+50-(unitWidth/2);
+  var xMax = outsideData.units[unit].x+50+(unitWidth/2);
+  var yMin = outsideData.units[unit].y+50-(unitHeight/2);
+  var yMax = outsideData.units[unit].y+50+(unitHeight/2);
+  if(x > xMin && x < xMax && y > yMin && y < yMax) {
+    return true;
+  }
+  return false;
+}
+
+function die() {
+
 }
 
 function leftBound() {
@@ -226,30 +276,25 @@ function colorMap(callback) {
 
 document.addEventListener('keydown', (event) => {
   const keyName = event.key;
-  if(act.up == 0 && act.right == 0) {
-    switch(keyName) {
-      case "w":
-        goUp();
-        break;
-      case "s":
-        goDown();
-        break;
-      case "d":
-        goRight();
-        break;
-      case "a":
-        goLeft();
-        break;
-      case " ":
-        console.log("space");
-        break;
-    };
-  };
+  if(keyName == "w") {
+    goUp();
+  }
+  if(keyName == "s") {
+    goDown();
+  }
+  if(keyName == "d") {
+    goRight();
+  }
+  if(keyName == "a") {
+    goLeft();
+  }
 });
 
 document.addEventListener('keyup', (event) => {
-  act.up = 0;
-  act.right = 0;
+  if(event.key == "w" || event.key == "s")
+    act.up = 0;
+  if(event.key == "a" || event.key == "d")
+    act.right = 0;
 });
 
 function goUp() {
@@ -275,13 +320,13 @@ document.addEventListener('click', (event) => {
 });
 
 function shoot(x2, y2) {
-  diff = unit(500, 350, x2, y2);
+  diff = unit(550, 400, x2, y2);
   let i=0;
   let aMissle = {
-   curX: X,
-   curY: Y,
-   dX: diff.x * 5,
-   dY: diff.y * 5,
+   curX: X+50,
+   curY: Y+50,
+   dX: diff.x * 15,
+   dY: diff.y * 15,
    dist: 0,
    type: "A",
    shooting: true
@@ -318,4 +363,21 @@ function unit(x1, y1, x2, y2) {
     y: (y2 - y1)/d
   }
   return dir;
+}
+
+function validate(format, input) {
+  var keys = Object.keys(format);
+  for(var i=0;i<keys.length;i++){
+    var key = keys[i];
+    if(input[key] == null) {
+      return false;
+    }
+    else {
+      if(typeof format[key] === 'object') {
+        if(!validate(format[key], input[key]))
+          return false;
+      }
+    }
+  }
+  return true;
 }

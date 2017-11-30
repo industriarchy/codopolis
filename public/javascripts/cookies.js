@@ -8,6 +8,54 @@ var docCookies = {
         if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
     }
     return null;  },
+  parseMap: function(map) {
+    var j = 0;
+    var k = 0;
+    for(var i=0; i < map.length; i++) {
+      if(map[i] == '%') {
+        // Detects a [
+        if(map[i+1] == '5' && map[i+2] == 'B') {
+          j++;
+        }
+        // Detects a comma
+        if(map[i+1] == '2' && map[i+2] == 'C') {
+          k++;
+        }
+      }
+    }
+    var columns = j-1;
+    var rows = (k+1)/columns;
+    j=0;
+    k=0;
+    var MAP = Array(columns).fill().map(() => Array(rows).fill(0));
+    var depth = 0;
+    for(var i=0; i < map.length; i++) {
+      if(map[i] == '%') {
+        // Detects a [
+        if(map[i+1] == '5' && map[i+2] == 'B') {
+          depth++;
+        }
+        // Detects a ]
+        if(map[i+1] == '5' && map[i+2] == 'D') {
+          if(i > 1 && depth > 1) {
+            MAP[k][j] = map[i-1];
+            k++;
+            j=0;
+          }
+          depth--;
+        }
+        // Detects a comma
+        if(map[i+1] == '2' && map[i+2] == 'C') {
+          if(i > 1 && depth > 1) {
+            MAP[k][j] = map[i-1];
+            j++;
+          }
+        }
+      }
+    }
+    return MAP;
+
+  },
   setItem: function (sKey, sValue, vEnd, sPath, sDomain, bSecure) {
     if (!sKey || /^(?:expires|max-age|path|domain|secure)$/i.test(sKey)) { return false; }
     var sExpires = "";

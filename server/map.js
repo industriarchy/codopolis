@@ -44,3 +44,5 @@ function initiateMap() {
   createWall(9, 9, 5, 0, 1);
   createWall(9, 8, 5, 3, 1);
 };
+
+module.exports = {map: MAP, initiateMap: initiateMap};
