@@ -1,11 +1,15 @@
 {
-  "name": "socket-chat-example",
+  "name": "Codopolis",
   "version": "0.0.1",
-  "description": "my first socket.io app",
+  "description": "A game for AI programming",
   "dependencies": {
+    "bcrypt": "^1.0.3",
+    "body-parser": "^1.18.2",
     "cookie-parser": "^1.4.3",
     "express": "^4.15.2",
     "express-session": "^1.15.6",
+    "mongodb": "^1.4.4",
+    "monk": "^6.0.4",
     "socket.io": "^2.0.4"
   },
   "scripts": {

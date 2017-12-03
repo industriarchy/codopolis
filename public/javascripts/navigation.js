@@ -1,3 +1,5 @@
+
+// Global Variables (I know I will eventually start using objects, maybe?)
 var X = 500;
 var Y = 350;
 var s = 5;
@@ -29,10 +31,13 @@ var data;
 var outsideData;
 var missles = {};
 var hits = {};
+
+// Formats
 var hitsF = {sender: 0, missle: 0, unit: 0};
 
 
 $( function() {
+  document.getElementById("logout").addEventListener("click", logout);
   id = docCookies.getItem('userId');
   MAP = docCookies.parseMap(docCookies.getItem('MAP'));
   columns = MAP.length;
@@ -107,7 +112,10 @@ function render() {
 }
 
 function canGo(iX, iY) {
-  if(MAP[parseInt(iX/100)][parseInt(iY/100)] != 0 || MAP[parseInt((iX+100)/100)][parseInt((iY+100)/100)] != 0) {
+  if(MAP[parseInt(iX/100)][parseInt(iY/100)] != 0
+  ||  MAP[parseInt((iX)/100)][parseInt((iY+100)/100)] != 0
+  ||  MAP[parseInt((iX+100)/100)][parseInt((iY)/100)] != 0
+  || MAP[parseInt((iX+100)/100)][parseInt((iY+100)/100)] != 0) {
     return false;
   }
   else {
@@ -204,6 +212,11 @@ function drawData() {
         ctx.stroke();
       }
     }
+    // draw health
+    if(outsideData.units != null) {
+      ctx.fillStyle = '#a32';
+      ctx.fillRect(cX+24,cY-15,outsideData.units[id].health/2, 5);
+    }
   }
   if(flipped) {
     ctx.drawImage(fDude, cX, cY, 100, 100);
@@ -211,9 +224,7 @@ function drawData() {
   else {
     ctx.drawImage(dude, cX, cY, 100, 100);
   }
-  // draw health
-  ctx.fillStyle = '#a32';
-  ctx.fillRect(cX+24,cY-15,outsideData.units[id].health/2, 5);
+
 }
 
 function hitUnit(x, y, unit) {
@@ -314,9 +325,11 @@ function goRight() {
 };
 
 document.addEventListener('click', (event) => {
-  var clickX = event.offsetX;
-  var clickY = event.offsetY;
-  shoot(clickX, clickY);
+  if(event.target.nodeName == "CANVAS") {
+    var clickX = event.offsetX;
+    var clickY = event.offsetY;
+    shoot(clickX, clickY);
+  }
 });
 
 function shoot(x2, y2) {
@@ -349,6 +362,17 @@ function shoot(x2, y2) {
   }
 
 };
+
+// Logout function
+function logout() {
+  $.ajax({
+      type: 'POST',
+      url: '/users/logout',
+      dataType: 'JSON'
+  }).done(function( response ) {
+      location.reload();
+  });
+}
 
 // Some basic utility functions
 
