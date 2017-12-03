@@ -10,7 +10,7 @@ I'd like to start everything with a simple "Battle Mode" in which each player wi
 All Data is passed via JSON through Socket.io from client to server vice/versa.
 
 The server will store user data with mongodb.
-
+<pre>
   ------------------ mapData Format  ----------------------
   curId: int          -> specifies the next id to be created by new player
   units: {
@@ -35,6 +35,7 @@ The server will store user data with mongodb.
       type: string    -> projectile type
     },
   ----------------------------------------------------------
+</pre>
 
 TODO:
 
