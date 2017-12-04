@@ -38,6 +38,21 @@ var hitsF = {sender: 0, missle: 0, unit: 0};
 
 $( function() {
   document.getElementById("logout").addEventListener("click", logout);
+  c = document.getElementById("theView");
+  c.addEventListener('click', (event) => {
+    var clickX = event.offsetX;
+    var clickY = event.offsetY;
+    shoot(clickX, clickY);
+  });
+  c.addEventListener('touchstart', (event) => {
+    initiateDrag(event);
+  });
+  c.addEventListener('touchend', (event) => {
+    endDrag(event);
+  });
+  c.addEventListener('touchmove', (event) => {
+    dragging(event);
+  });
   id = docCookies.getItem('userId');
   MAP = docCookies.parseMap(docCookies.getItem('MAP'));
   columns = MAP.length;
@@ -60,7 +75,7 @@ $( function() {
     render();
     drawMap();
   });
-  c = document.getElementById("theView");
+
   ctx = c.getContext("2d");
   dude.src = '/static/images/still.png';
   fDude.src = '/static/images/stillF.png';
@@ -167,35 +182,38 @@ function drawData() {
       var keys = Object.keys(outsideData.units);
       for(var i=0;i<keys.length;i++){
         var key= keys[i];
-        if(key != id) {
-          if(outsideData.units[key].ll) {
-            ctx.drawImage(fDude, outsideData.units[key].x - X + 500, outsideData.units[key].y - Y + 350, 100, 100);
-          }
-          else {
-            ctx.drawImage(dude, outsideData.units[key].x - X + 500, outsideData.units[key].y - Y + 350, 100, 100);
-          }
-          ctx.fillStyle = '#a32';
-          ctx.fillRect(outsideData.units[key].x+24 - X + 500,outsideData.units[key].y-15 - Y + 350,outsideData.units[key].health/2, 5);
-        }
 
-        //Check for hit
-        var myMissles = outsideData.missles;
-        hits = {};
-        if(myMissles != null && key != id) {
-          var keys2 = Object.keys(myMissles);
-          for(var j=0; j<keys2.length; j++) {
-            var key2 = keys2[j];
+        // check if unit is logged in
+        if(outsideData.units[key].loggedIn) {
+          if(key != id) {
+            if(outsideData.units[key].ll) {
+              ctx.drawImage(fDude, outsideData.units[key].x - X + 500, outsideData.units[key].y - Y + 350, 100, 100);
+            }
+            else {
+              ctx.drawImage(dude, outsideData.units[key].x - X + 500, outsideData.units[key].y - Y + 350, 100, 100);
+            }
+            ctx.fillStyle = '#a32';
+            ctx.fillRect(outsideData.units[key].x+24 - X + 500,outsideData.units[key].y-15 - Y + 350,outsideData.units[key].health/2, 5);
+          }
 
-            // Need to actually run a validate here
-            if(myMissles[key2].curX != null) {
-              if(hitUnit(myMissles[key2].curX, myMissles[key2].curY, key)) {
-                // need to send hit
-                hits = {sender: id, missle: key2, unit: key};
+          //Check for hit
+          var myMissles = outsideData.missles;
+          hits = {};
+          if(myMissles != null && key != id) {
+            var keys2 = Object.keys(myMissles);
+            for(var j=0; j<keys2.length; j++) {
+              var key2 = keys2[j];
+
+              // Need to actually run a validate here
+              if(myMissles[key2].curX != null) {
+                if(hitUnit(myMissles[key2].curX, myMissles[key2].curY, key)) {
+                  // need to send hit
+                  hits = {sender: id, missle: key2, unit: key};
+                }
               }
             }
           }
         }
-
       }
     }
 
@@ -324,13 +342,38 @@ function goRight() {
   act.right = s;
 };
 
-document.addEventListener('click', (event) => {
-  if(event.target.nodeName == "CANVAS") {
-    var clickX = event.offsetX;
-    var clickY = event.offsetY;
-    shoot(clickX, clickY);
+
+// For Mobile Controls
+var sX, sY, eX, eY;
+var pointing = false;
+function initiateDrag(e) {
+  sX = e.changedTouches[0].pageX;
+  sY = e.changedTouches[0].pageY;
+  if(sX > 500 && sX < 600 && sY > 450 && sY < 550) {
+    pointing = true;
+    eX = sX;
+    eY = sY;
+    sX = 550;
+    sY = 500;
   }
-});
+};
+
+function endDrag(e) {
+  pointing = false;
+  act.up = 0;
+  act.right = 0;
+};
+
+function dragging(e) {
+  console.log(pointing);
+  if(pointing) {
+    eX = e.changedTouches[0].pageX;
+    eY = e.changedTouches[0].pageY;
+    let vec = unit(sX, sY, eX, eY);
+    act.up = -(vec.y * s);
+    act.right = vec.x * s;
+  }
+};
 
 function shoot(x2, y2) {
   diff = unit(550, 400, x2, y2);

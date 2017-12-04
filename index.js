@@ -82,6 +82,7 @@ app.get('/', function(req, res){
 //      ll: bool        -> var for looking right
 //      timeout: int    -> time left before another shot
 //      health: int     -> amount of health left
+//      loggedIn: bool  -> determines if logged in or not
 //      }
 //    },
 //  },
@@ -128,6 +129,7 @@ io.on('connection', function(socket){
     mapData.units[msg.unit.id].up= msg.unit.up;
     mapData.units[msg.unit.id].right = msg.unit.right
     mapData.units[msg.unit.id].ll = msg.unit.ll;
+    mapData.units[msg.unit.id].loggedIn = true;
     if(msg.unit.missles == undefined) {
       mapData.units[msg.unit.id].missles = {};
     }
@@ -169,30 +171,34 @@ function processData() {
     for(var i=0;i<keys.length;i++){
       var key = keys[i];
 
-      // Process hits
-      var keys2 = Object.keys(mapData.missles);
-      for(let j=0; j<keys2.length; j++) {
-        var key2 = keys2[j];
-        var missle = mapData.missles[key2];
-        if(validate(misslesF, missle)) {
-          if(missle.sender != key) {
-            if(hitUnit(missle.curX, missle.curY, mapData.units[key])) {
-              delete mapData.missles[key2];
-              mapData.units[key].health -= damage;
-              if(mapData.units[key].health < 0) {
-                die(key);
+      // Only look at units currently logged in
+      if(mapData.units[key].loggedIn == true) {
+
+        // Process hits
+        var keys2 = Object.keys(mapData.missles);
+        for(let j=0; j<keys2.length; j++) {
+          var key2 = keys2[j];
+          var missle = mapData.missles[key2];
+          if(validate(misslesF, missle)) {
+            if(missle.sender != key) {
+              if(hitUnit(missle.curX, missle.curY, mapData.units[key])) {
+                delete mapData.missles[key2];
+                mapData.units[key].health -= damage;
+                if(mapData.units[key].health < 0) {
+                  die(key);
+                }
               }
             }
           }
         }
-      }
 
-      // Process units
-      if(canGo(mapData.units[key].x + mapData.units[key].right, mapData.units[key].y)) {
-        mapData.units[key].x += mapData.units[key].right;
-      }
-      if(canGo(mapData.units[key].x, mapData.units[key].y - mapData.units[key].up)) {
-        mapData.units[key].y -= mapData.units[key].up;
+        // Process units
+        if(canGo(mapData.units[key].x + mapData.units[key].right, mapData.units[key].y)) {
+          mapData.units[key].x += mapData.units[key].right;
+        }
+        if(canGo(mapData.units[key].x, mapData.units[key].y - mapData.units[key].up)) {
+          mapData.units[key].y -= mapData.units[key].up;
+        }
       }
     }
   }
@@ -247,7 +253,8 @@ function die(unit) {
     up: 0,
     health: 100,
     timeout: 0,
-    alive: false
+    alive: false,
+    loggedIn: true
   };
 }
 
