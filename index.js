@@ -20,17 +20,25 @@ db.then(() => {
 var io = require('socket.io').listen(server);
 var session = require('express-session');
 var cookieParser = require('cookie-parser');
+var RedisStore = require("connect-redis")(session);
 var map = require('./server/map.js');
 var users = require('./routes/users');
 
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(session({
-  secret: 'samwise',
-  resave: false,
-  saveUninitialized: true
-}));
+
+var sessionMiddleware = session({
+    secret: 'samwise',
+    resave: false,
+    saveUninitialized: true
+    // store: new RedisStore()
+});
+io.use(function(socket, next) {
+    sessionMiddleware(socket.request, socket.request.res, next);
+});
+
+app.use(sessionMiddleware);
 
 // Make our db accessible to our router
 app.use(function (req, res, next) {
@@ -48,19 +56,20 @@ var unitWidth = 60;
 var unitHeight = 100;
 var numConnected = 0;
 var alreadySending = false;
-const speed = 30;
+const speed = 300;
 const damage = 30;
+var sAddresses = {};
 
 app.use(cookieParser());
 
 // set up static file serving from the public directory
 app.use('/static', express.static(__dirname + '/public'));
 
+map.readMap();
 // Setup Routing for main page
 app.get('/', function(req, res){
   if(!req.session.user) {
     // Show Login
-    map.initiateMap();
     res.sendFile(__dirname + '/login.html');
   }
   else {
@@ -97,6 +106,7 @@ app.get('/', function(req, res){
 //      dist: int       -> distance traveled so far
 //      type: string    -> projectile type
 //    },
+//  map: map
 //  ----------------------------------------------------------
 
 
@@ -108,34 +118,54 @@ var mapData = {
   curId: 0,
   units: {},
   curMId: 0,
-  missles: {}
+  missles: {},
+  setMap: true
 };
 hits = [];
 
 io.on('connection', function(socket){
+  let newClient = {socket: socket.id};
+  pushIfNew(newClient);
   socket.on('appData', function(msg){
+    // Set idle timeout
+    sAddresses[socket.id].idle = 0;
 
+    if(msg.mapSet) {
+      sAddresses[socket.id].data.setMap = false;
+      delete sAddresses[socket.id].map;
+    }
+
+    // Need to validate data structure here for incoming data (msg)
     if(msg.unit.alive == true) {
       if(mapData.units[msg.unit.id] != null) {
         mapData.units[msg.unit.id].alive = true;
       }
     }
 
-    // console.log(msg);
     if(mapData.units[msg.unit.id] == null) {
       mapData.units[msg.unit.id] = msg.unit;
       mapData.units[msg.unit.id].missles.timeout = 0;
     }
+    console.log("X: ", mapData.units[msg.unit.id].x, ", Y: ", mapData.units[msg.unit.id].y);
+
     mapData.units[msg.unit.id].up= msg.unit.up;
     mapData.units[msg.unit.id].right = msg.unit.right
     mapData.units[msg.unit.id].ll = msg.unit.ll;
     mapData.units[msg.unit.id].loggedIn = true;
+
+    // Add a missle if there
     if(msg.unit.missles == undefined) {
       mapData.units[msg.unit.id].missles = {};
     }
     else {
       shoot(msg);
     }
+
+    // if building add a wall
+    if(msg.unit.build.type != 0) {
+      build(msg);
+    }
+
     // TODO: Push hit checking to the front end and validate here
     // if(validate(hitsF, msg.hits)) {
     //   console.log("validated hits");
@@ -152,15 +182,38 @@ io.on('connection', function(socket){
 // Should try to see if map is different before sending as well to avoid extra emits
 // Also should try to send different data depending on the person
 function batchSend(socket) {
+  pushIfNew(socket.id);
   if(!alreadySending) {
     setInterval(() => {
       if(numConnected > 0) {
         processData();
-        io.emit('appData', mapData);
+
+        // JSON method
+        var keys = Object.keys(sAddresses);
+        for(let j=0;j<keys.length;j++) {
+          var key = keys[j];
+          sAddresses[key].idle++;
+          sAddresses[key].data.units = mapData.units;
+          sAddresses[key].data.missles = mapData.missles;
+          sAddresses[key].data.builds = mapData.builds;
+          io.to(key).emit('appData', sAddresses[key].data);
+          delete sAddresses[key].data.builds;
+          if(sAddresses[key] != null) {
+            if(sAddresses[key].idle > 30) {
+              delete sAddresses[key];
+            }
+          }
+        }
+
       };
     }, speed);
     alreadySending = true;
   }
+}
+
+function pushIfNew(socket) {
+  if(sAddresses[socket] == null)
+    sAddresses[socket] = {data: {map: map.map, setMap: true}, idle: 0};
 }
 
 function processData() {
@@ -193,10 +246,11 @@ function processData() {
         }
 
         // Process units
+        let beforeX = mapData.units[key].x;
         if(canGo(mapData.units[key].x + mapData.units[key].right, mapData.units[key].y)) {
           mapData.units[key].x += mapData.units[key].right;
         }
-        if(canGo(mapData.units[key].x, mapData.units[key].y - mapData.units[key].up)) {
+        if(canGo(beforeX, mapData.units[key].y - mapData.units[key].up)) {
           mapData.units[key].y -= mapData.units[key].up;
         }
       }
@@ -236,12 +290,13 @@ function hitUnit(x, y, unit) {
 }
 
 function hitWall(iX, iY) {
-  if(map.map[parseInt(iX/100)][parseInt(iY/100)] != 0) {
-    return true;
-  }
-  else {
+  if(map.map[parseInt(iX/100)][parseInt(iY/100)] == 0) {
     return false;
   }
+  if(map.map[parseInt(iX/100)][parseInt(iY/100)].type == 3) {
+    return false;
+  }
+  return true;
 }
 
 function die(unit) {
@@ -258,16 +313,23 @@ function die(unit) {
   };
 }
 
+// If all four corners are clear return true, else false
 function canGo(iX, iY) {
-  if(map.map[parseInt(iX/100)][parseInt(iY/100)] != 0
-  || map.map[parseInt((iX)/100)][parseInt((iY+100)/100)] != 0
-  || map.map[parseInt((iX+100)/100)][parseInt((iY)/100)] != 0
-  || map.map[parseInt((iX+100)/100)][parseInt((iY+100)/100)] != 0) {
-    return false;
-  }
-  else {
+  if(isClear(map.map[parseInt((iX+20)/100)][parseInt(iY/100)])
+  && isClear(map.map[parseInt((iX+20)/100)][parseInt((iY+99)/100)])
+  && isClear(map.map[parseInt((iX+80)/100)][parseInt((iY)/100)])
+  && isClear(map.map[parseInt((iX+80)/100)][parseInt((iY+99)/100)])) {
     return true;
   }
+  return false;
+}
+
+function isClear(tile) {
+  if(tile == 0)
+    return true;
+  if(tile.type == 3)
+    return true;
+  return false;
 }
 
 function makeChar(id) {
@@ -320,6 +382,12 @@ function shoot(msg) {
   else {
     mapData.units[msg.unit.id].timeout--;
   }
+}
+
+function build(msg) {
+  map.change(msg.unit.build.type, msg.unit.build.x, msg.unit.build.y);
+  console.log(msg.unit.build.type);
+  mapData.builds = {type: msg.unit.build.type, x: msg.unit.build.x, y: msg.unit.build.y};
 }
 
 function validate(format, input) {
