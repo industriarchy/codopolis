@@ -56,7 +56,7 @@ var unitWidth = 60;
 var unitHeight = 100;
 var numConnected = 0;
 var alreadySending = false;
-const speed = 300;
+const speed = 30;
 const damage = 30;
 var sAddresses = {};
 
@@ -111,7 +111,7 @@ app.get('/', function(req, res){
 
 
 // FORMATS
-var hitsF = {sender: 0, missle: 0, unit: 0};
+// var hitsF = {sender: 0, missle: 0, unit: 0};
 var misslesF = {sender: 0, curX: 0, curY: 0, dX: 0, dY: 0, dist: 0, type: "A"}
 
 var mapData = {
@@ -121,18 +121,20 @@ var mapData = {
   missles: {},
   setMap: true
 };
-hits = [];
+// hits = [];
 
 io.on('connection', function(socket){
   let newClient = {socket: socket.id};
   pushIfNew(newClient);
   socket.on('appData', function(msg){
     // Set idle timeout
-    sAddresses[socket.id].idle = 0;
+    if(sAddresses[socket.id]) {
+      sAddresses[socket.id].idle = 0;
 
-    if(msg.mapSet) {
-      sAddresses[socket.id].data.setMap = false;
-      delete sAddresses[socket.id].map;
+      if(msg.mapSet) {
+        sAddresses[socket.id].data.setMap = false;
+        delete sAddresses[socket.id].data.map;
+      }
     }
 
     // Need to validate data structure here for incoming data (msg)
@@ -146,7 +148,6 @@ io.on('connection', function(socket){
       mapData.units[msg.unit.id] = msg.unit;
       mapData.units[msg.unit.id].missles.timeout = 0;
     }
-    console.log("X: ", mapData.units[msg.unit.id].x, ", Y: ", mapData.units[msg.unit.id].y);
 
     mapData.units[msg.unit.id].up= msg.unit.up;
     mapData.units[msg.unit.id].right = msg.unit.right

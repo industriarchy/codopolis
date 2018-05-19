@@ -3,9 +3,7 @@
   "version": "0.0.1",
   "description": "A game for AI programming",
   "dependencies": {
-    "bcrypt": "^1.0.3",
     "body-parser": "^1.18.2",
-    "connect-redis": "^3.3.2",
     "cookie-parser": "^1.4.3",
     "express": "^4.15.2",
     "express-session": "^1.15.6",
@@ -14,7 +12,8 @@
     "socket.io": "^2.0.4"
   },
   "scripts": {
-    "start": "node index.js",
+    "start": "npm run build && node index.js",
+    "build": "browserify public/javascripts/App.js -o public/javascripts/bundle.js",
     "server": "mongod --dbpath data"
   }
 }

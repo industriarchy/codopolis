@@ -89,3 +89,5 @@ var docCookies = {
       return aKeys;
   }
 };
+
+module.exports = docCookies;

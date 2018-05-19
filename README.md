@@ -39,13 +39,10 @@ The server will store user data with mongodb.
 
 TODO:
 
+* Refactor code to make it more organized
 * Data needs to be validated so server never crashes
-* Login needs to be created
-* Database needs to be added
 * Dogs need to be added
 * Programming needs to be added to Dogs
-* Wall Building needs to be added
 * Resources need to be added
 * Creeps need to be added
-* Map-maker needs to be created
 * Map needs to be made
