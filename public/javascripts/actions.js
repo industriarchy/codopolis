@@ -4,7 +4,7 @@
 
 var utils = require('./utility');
 var model = require('./model');
-var model = require('./model');
+var docCookies = require('./cookies');
 
 var mouse;
 var sX, sY, eX, eY;
@@ -143,6 +143,25 @@ function logout() {
   });
 }
 
+function detectFlag() {
+  model.flags.forEach( (flag, i) => {
+    if(utils.dist(model.X+50, model.Y+80, flag.x*100+50, flag.y*100+50) < 60) {
+      if(model.flags[i].health < 1)
+        model.flags[i].owner = docCookies.getItem('userId');
+      if(model.flags[i].owner == docCookies.getItem('userId')) {
+        model.flags[i].health++;
+      }
+      else {
+        model.flags[i].health--;
+      }
+      actions.drainFlag = { flag: model.flags[i], id: i};
+    }
+    else {
+      // console.log("dist is", utils.dist(model.X, model.Y, flag.x*100+50, flag.y*100+50));
+    }
+  });
+}
+
 // Export functions
 var actions = {
 
@@ -206,7 +225,13 @@ var actions = {
   missles: {},                    // actions
   mouse: {},                          // actions
   sX, sY, eX, eY,                   // actions
-  build: {type: 0, x: 0, y: 0}    // actions
+  build: {type: 0, x: 0, y: 0},    // actions
+  drainFlag: {
+    draing: false,
+    x: 0, y: 0
+  },
+  detectFlag: detectFlag,
+  drainFlag: {}
 }
 
 module.exports = actions;

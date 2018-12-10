@@ -7,11 +7,11 @@ The programming of the dogs will be either on the users front end or through a s
 
 I'd like to start everything with a simple "Battle Mode" in which each player will simply be able to quickly dual other AI or other players.
 
-All Data is passed via JSON through Socket.io from client to server vice/versa.
+All Data is passed via JSON through Socket.io from client to server vice/versa. This might be better handled in the future with javascript blobs.
 
 The server will store user data with mongodb.
 <pre>
-  ------------------ mapData Format  ----------------------
+  ------------------ Model Data Format  ----------------------
   curId: int          -> specifies the next id to be created by new player
   units: {
    id: {              -> id of the units
@@ -23,7 +23,7 @@ The server will store user data with mongodb.
       }
     },
   },
-  curMId: int
+  curMId: int         -> specifies the next id of the missles
   missles: {
     id: { int         -> id of missle
       sender: int     -> id of the sender
@@ -34,15 +34,58 @@ The server will store user data with mongodb.
       dist: int       -> distance traveled so far
       type: string    -> projectile type
     },
+  },
+  flags: {
+    x: int,
+    y: int,
+    owner: string,
+    health: float
+  }
+  map: map
   ----------------------------------------------------------
 </pre>
 
+AI API:
+
+* ai: create
+ * creates a new ai character
+* ai: getUser
+ * gets all ai associated with user
+* ai: getUnit
+ * gets information about the ai unit
+* ai: getView
+ * get the view for the unit
+* ai: act
+ * send commands to the unit
+
+
+MAP TILE SETUP:
+
+
+|Type             |Number(t)     |Walkable      |h       |o    |
+|-----------------|--------------|--------------|--------|-----|
+|Grass            |0             |Yes           |10      |x    |
+|Deep water       |1             |No            |0       |0    |
+|Shallow Water    |2             |No            |0       |x    |
+|Path             |3             |Yes           |0       |x    |
+|Hillside         |6             |No            |0       |0    |
+|Ramp             |7             |No            |0       |x    |
+
+|Additional(a)    |Number(a)     |Walkable      |h       |o    |
+|-----------------|--------------|--------------|--------|-----|
+|flag             |1             |Yes           |0       |x    |
+|Tree             |2             |No            |10      |x    |
+|Wall             |3             |No            |10      |x    |
+|Farm             |4             |Yes           |10      |x    |
+|Mine             |5             |Yes           |10      |x    |
+
 TODO:
 
-* Refactor code to make it more organized
 * Data needs to be validated so server never crashes
 * Dogs need to be added
+ * basic following algorithm
 * Programming needs to be added to Dogs
 * Resources need to be added
 * Creeps need to be added
 * Map needs to be made
+* Save on logouts and every 30 seconds?

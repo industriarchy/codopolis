@@ -25,41 +25,71 @@ $( function() {
   render.setCtx(ctx);
   model.dude.src = '/static/images/still.png';
   model.fDude.src = '/static/images/stillF.png';
+  model.creeps.dog = new Image();
+  model.creeps.dog.src = '/static/images/dog.png';
   model.id = docCookies.getItem('userId');
 
   socket.on('appData', function(msg){
-    // Emit your actions data
-    var data = { unit: {id: model.id, ll: model.flipped, up: actions.act.up, right: actions.act.right,
-       missles: actions.missles, alive: true, build: actions.build}, mapSet: mapSet };
-    socket.emit('appData', data);
-
-    // Reset if dead
-    if(msg.units[model.id].alive == false || resetWait > 1) {
-      resetWait = 0;
-      resetLoc();
+    // determine if timeout
+    if(msg.idle > 30) {
+      console.log("idle", msg.idle);
+      render.renderIdle();
     }
-    resetWait++;
+    else {
 
-    if(model.needsReset) {
-      resetLoc();
-    }
-
-    // Set map
-    if(msg.units != null) {
-      if(msg.setMap) {
-        model.MAP = msg.map;
-        mapSet = true;
-        model.columns = model.MAP.length;
-        model.rows = model.MAP[0].length;
+      // determine if game is won
+      if (msg.win && msg.win.won) {
+        render.gameWon(msg.win);
       }
+      else {
 
-      // Collect Data and render collected Data
-      clearData();
-      outsideData = msg;
-      render.render(outsideData);
+        // Emit your actions data
+        var data = { unit: {id: model.id, ll: model.flipped, up: actions.act.up, right: actions.act.right,
+           missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag}, mapSet: mapSet };
+        socket.emit('appData', data);
+
+        // Reset if dead
+        if(msg.units[model.id].alive == false || resetWait > 1) {
+          resetWait = 0;
+          resetLoc();
+        }
+        resetWait++;
+
+        if(model.needsReset) {
+          resetLoc();
+        }
+
+        // Set map
+        if(msg.units != null) {
+          if(msg.setMap) {
+            model.MAP = msg.map;
+            mapSet = true;
+            model.columns = model.MAP.length;
+            model.rows = model.MAP[0].length;
+          }
+
+          // Collect Data and render collected Data
+          clearData();
+          outsideData = msg;
+          render.render(outsideData);
+        }
+
+        // Update Flags
+        updateFlags(msg.flags);
+        // Detect Drain Flags
+        actions.detectFlag();
+      }
     }
   });
 });
+
+function updateFlags(flags) {
+  model.flags = flags;
+  flags.map( (flag, i) => {
+    model.MAP[flag.x][flag.y].h = flag.health;
+    model.MAP[flag.x][flag.y].o = flag.owner;
+  });
+}
 
 function setMapPart(x1, y1, x2, y2, mapPart) {
   for(let i=0; i<(y2-y1); i++) {
@@ -82,6 +112,7 @@ function resetLoc() {
 function clearData() {
   actions.missles = {};
   actions.build.type = 0;
+  actions.drainFlag = {};
 }
 
 },{"./actions":2,"./cookies":3,"./model":4,"./render":5,"./utility":6}],2:[function(require,module,exports){
@@ -91,7 +122,7 @@ function clearData() {
 
 var utils = require('./utility');
 var model = require('./model');
-var model = require('./model');
+var docCookies = require('./cookies');
 
 var mouse;
 var sX, sY, eX, eY;
@@ -230,6 +261,25 @@ function logout() {
   });
 }
 
+function detectFlag() {
+  model.flags.forEach( (flag, i) => {
+    if(utils.dist(model.X+50, model.Y+80, flag.x*100+50, flag.y*100+50) < 60) {
+      if(model.flags[i].health < 1)
+        model.flags[i].owner = docCookies.getItem('userId');
+      if(model.flags[i].owner == docCookies.getItem('userId')) {
+        model.flags[i].health++;
+      }
+      else {
+        model.flags[i].health--;
+      }
+      actions.drainFlag = { flag: model.flags[i], id: i};
+    }
+    else {
+      // console.log("dist is", utils.dist(model.X, model.Y, flag.x*100+50, flag.y*100+50));
+    }
+  });
+}
+
 // Export functions
 var actions = {
 
@@ -293,12 +343,18 @@ var actions = {
   missles: {},                    // actions
   mouse: {},                          // actions
   sX, sY, eX, eY,                   // actions
-  build: {type: 0, x: 0, y: 0}    // actions
+  build: {type: 0, x: 0, y: 0},    // actions
+  drainFlag: {
+    draing: false,
+    x: 0, y: 0
+  },
+  detectFlag: detectFlag,
+  drainFlag: {}
 }
 
 module.exports = actions;
 
-},{"./model":4,"./utility":6}],3:[function(require,module,exports){
+},{"./cookies":3,"./model":4,"./utility":6}],3:[function(require,module,exports){
 var docCookies = {
   getItem: function (name) {
     nameEQ = name + "=";
@@ -413,6 +469,7 @@ var model = {
   cY: (vHeight/2-50),
   dude: dude,
   fDude: fDude,
+  creeps: {},
   flipped: false,
   timeSet: Date.now(),    // unused?
   needsReset: true,
@@ -421,7 +478,8 @@ var model = {
   rows: 0,
   unitWidth: 60,
   unitHeight: 100,
-  id: 0
+  id: 0,
+  flags: []
 }
 
 module.exports = model;
@@ -436,6 +494,13 @@ const utils = require('./utility');
 const actions = require('./actions');
 let ctx;
 let outsideData;
+
+function renderIdle() {
+  ctx.clearRect(0, 0, model.vWidth, model.vHeight);
+  ctx.fillStyle = 'white';
+  ctx.font = "30px Arial";
+  ctx.fillText("Idled out, please refresh page",350,300);
+};
 
 // This is for client-side rendering (for personal action to be smoother/quicker)
 function renderActions() {
@@ -459,7 +524,7 @@ function renderActions() {
   if(actions.act.right > 0) {
     model.flipped = false;
   }
-}
+};
 
 // If all four corners are clear return true, else false
 function canGo(iX, iY) {
@@ -470,58 +535,77 @@ function canGo(iX, iY) {
     return true;
   }
   return false;
-}
+};
 
 function isClear(tile) {
-  if(tile == 0)
-    return true;
-  if(tile.type == 3)
+  if((tile.t == 0 || tile.t == 3 || tile.y == 7) && tile.a != 2)
     return true;
   return false;
-}
+};
 
 function drawMap() {
   let x0 = 500-model.X;
   let y0 = 350-model.Y;
   var grd = ctx.createLinearGradient(0,0,200,0);
 
-  // Draw the map Tiles
-  for(let i=leftBound(); i<rightBound(); i++) {
-    for(let j=topBound(); j<bottomBound(); j++) {
-      if(model.MAP[i][j] == 0) {
-        grassTile(i*100+x0,j*100+y0);
+  // Draw the map Tiles for each level
+  for(let l=0; l<5; l++) {
+
+    // Draw the map Shadows
+    for(let i=leftBound(); i<rightBound(); i++) {
+      for(let j=topBound(); j<bottomBound(); j++) {
+        if(model.MAP[i][j].l > 0 && model.MAP[i][j].l == l) {
+          if(model.MAP[i][j].t == 6) {
+            drawRampShadowY(i*100+x0, j*100+y0);
+          }
+          else {
+            drawShadow(i*100+x0, j*100+y0);
+          }
+        }
+        // else if(MAP[i][j].type == 4){
+        //   drawShadow(i*100+x0, j*100+y0);
+        // }
       }
-      else if(model.MAP[i][j].type == 2){
-        waterTile(i*100+x0,j*100+y0);
-      }
-      else if(model.MAP[i][j].type == 3){
-        pathTile(i*100+x0,j*100+y0);
-      }
-      else if(model.MAP[i][j].type == 4){
-        grassTile(i*100+x0,j*100+y0);
+    }
+
+    for(let i=leftBound(); i<rightBound(); i++) {
+      for(let j=topBound(); j<bottomBound(); j++) {
+        if(model.MAP[i][j].l == l) {
+          if(model.MAP[i][j].t == 0) {
+            grassTile(i*100+x0,j*100+y0);
+          }
+          else if(model.MAP[i][j].t == 2){
+            waterTile(i*100+x0,j*100+y0);
+          }
+          else if(model.MAP[i][j].t == 3){
+            pathTile(i*100+x0,j*100+y0);
+          }
+          else if(model.MAP[i][j].t == 4){
+            grassTile(i*100+x0,j*100+y0);
+          }
+          else if(model.MAP[i][j].t == 6){
+            rampY(i*100+x0,j*100+y0);
+          }
+          else if(model.MAP[i][j].t == 7){
+            waterTileb(i*100+x0,j*100+y0);
+          }
+        }
       }
     }
   }
 
-  // Draw the map Shadows
+  // Draw the map additions
   for(let i=leftBound(); i<rightBound(); i++) {
     for(let j=topBound(); j<bottomBound(); j++) {
-      if(model.MAP[i][j] == 1 || model.MAP[i][j].type == 1) {
-        drawShadow(i*100+x0, j*100+y0);
+      if(model.MAP[i][j].a == 1){
+        flag(i*100+x0, j*100+y0, '#f00', model.MAP[i][j].h);
+        // flag(i*100+x0, j*100+y0, '#f00', 100);
       }
-      else {
-      }
-    }
-  }
-
-  // Draw the map Walls
-  for(let i=leftBound(); i<rightBound(); i++) {
-    for(let j=topBound(); j<bottomBound(); j++) {
-      if(model.MAP[i][j] == 1 || model.MAP[i][j].type == 1) {
-        wallTile(i*100+x0, j*100+y0);
-      }
-      else if(model.MAP[i][j].type == 4){
+      else if(model.MAP[i][j].a == 2){
         smallTree(i*100+x0, j*100+y0);
+      }
+      else if(model.MAP[i][j].a == 3) {
+        wallTile(i*100+x0, j*100+y0);
       }
     }
   }
@@ -530,7 +614,7 @@ function drawMap() {
     highLightPotential();
   }
   drawData();
-}
+};
 
 function highLightPotential() {
   let offSX = 100 - model.X%100;
@@ -578,14 +662,14 @@ function highLightPotential() {
   ctx.rect(500+offSX, 450+offSY, 100, 100);
   ctx.strokeStyle = '#2255ff';
   ctx.stroke();
-}
+};
 
 function mouseInside(x1, x2, y1, y2) {
   if(actions.mouse.offsetX > x1 && actions.mouse.offsetX < x2 &&
     actions.mouse.offsetY > y1 && actions.mouse.offsetY < y2) {
     return true; }
   else { return false; }
-}
+};
 
 function grassTile(x, y) {
   ctx.fillStyle = '#5a2';
@@ -596,27 +680,42 @@ function grassTile(x, y) {
   ctx.lineTo(x+30, y+10);
   ctx.strokeStyle = '#000';
   ctx.stroke();
-}
+};
 
 function waterTile(x, y) {
   ctx.fillStyle = '#57a';
   ctx.fillRect(x,y,100, 100);
-}
+};
+
+function waterTileb(x, y) {
+  ctx.fillStyle = '#469';
+  ctx.fillRect(x,y,100, 100);
+};
 
 function blankTile(x, y) {
   ctx.fillStyle = '#333';
   ctx.fillRect(x,y,100, 100);
-}
+};
 
 function pathTile(x, y) {
   ctx.fillStyle = '#9a6';
   ctx.fillRect(x,y,100, 100);
-}
+};
 
 function wallTile(x, y) {
   ctx.fillStyle = '#aaa';
   ctx.fillRect(x, y,100, 100);
-}
+};
+
+function rampY(x, y) {
+  ctx.fillStyle = '#5a2';
+  ctx.fillRect(x,y,100, 100);
+};
+
+function rampX(x, y) {
+  ctx.fillStyle = '#5a2';
+  ctx.fillRect(x,y,100, 100);
+};
 
 function smallTree(x, y) {
   ctx.beginPath();
@@ -625,7 +724,29 @@ function smallTree(x, y) {
   ctx.fill();
   ctx.strokeStyle="#371";
   ctx.stroke();
-}
+};
+
+function flag(x, y, color, health) {
+  // Draw pole
+  ctx.beginPath();
+  ctx.moveTo(x+50, y+10);
+  ctx.lineTo(x+50, y+80);
+  ctx.strokeStyle = '#333';
+  // Draw flag part
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x+50, y+40);
+  ctx.lineTo(x+80, y+25);
+  ctx.lineTo(x+50, y+10);
+  ctx.lineTo(x+50, y+40);
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+  ctx.stroke();
+  ctx.fill();
+  // Draw Health
+  ctx.fillStyle = '#a32';
+  ctx.fillRect(x+24, y-15, health/2, 5);
+};
 
 function drawShadow(x, y) {
   ctx.fillStyle = '#aaa';
@@ -633,7 +754,11 @@ function drawShadow(x, y) {
   ctx.shadowColor = "#444";
   ctx.fillRect(x, y,100, 100);
   ctx.shadowBlur = 0;
-}
+};
+
+function drawOnTop() {
+
+};
 
 function drawData() {
   // Draw the Outside Data
@@ -646,34 +771,40 @@ function drawData() {
         var key= keys[i];
 
         // check if unit is logged in
-        if(outsideData.units[key].loggedIn) {
-          if(key != model.id) {
-            if(outsideData.units[key].ll) {
-              ctx.drawImage(model.fDude, outsideData.units[key].x - model.X + 500, outsideData.units[key].y - model.Y + 350, 100, 100);
+        if(outsideData.units[key]) {
+          if(outsideData.units[key].loggedIn) {
+            if(key != model.id) {
+              if(outsideData.units[key].ll) {
+                ctx.drawImage(model.fDude, outsideData.units[key].x - model.X + 500, outsideData.units[key].y - model.Y + 350, 100, 100);
+              }
+              else {
+                ctx.drawImage(model.dude, outsideData.units[key].x - model.X + 500, outsideData.units[key].y - model.Y + 350, 100, 100);
+              }
+              ctx.fillStyle = '#a32';
+              ctx.fillRect(outsideData.units[key].x+24 - model.X + 500,outsideData.units[key].y-15 - model.Y + 350,outsideData.units[key].health/2, 5);
             }
-            else {
-              ctx.drawImage(model.dude, outsideData.units[key].x - model.X + 500, outsideData.units[key].y - model.Y + 350, 100, 100);
-            }
-            ctx.fillStyle = '#a32';
-            ctx.fillRect(outsideData.units[key].x+24 - model.X + 500,outsideData.units[key].y-15 - model.Y + 350,outsideData.units[key].health/2, 5);
-          }
 
-          //Check for hit
-          var myMissles = outsideData.missles;
-          hits = {};
-          if(myMissles != null && key != model.id) {
-            var keys2 = Object.keys(myMissles);
-            for(var j=0; j<keys2.length; j++) {
-              var key2 = keys2[j];
+            //Check for hit
+            var myMissles = outsideData.missles;
+            hits = {};
+            if(myMissles != null && key != model.id) {
+              var keys2 = Object.keys(myMissles);
+              for(var j=0; j<keys2.length; j++) {
+                var key2 = keys2[j];
 
-              // Need to actually run a validate here
-              if(myMissles[key2].curX != null) {
-                if(hitUnit(myMissles[key2].curX, myMissles[key2].curY, key)) {
-                  // need to send hit
-                  hits = {sender: model.id, missle: key2, unit: key};
+                // Need to actually run a validate here
+                if(myMissles[key2].curX != null) {
+                  if(hitUnit(myMissles[key2].curX, myMissles[key2].curY, key)) {
+                    // need to send hit
+                    hits = {sender: model.id, missle: key2, unit: key};
+                  }
                 }
               }
             }
+          }
+          else if(outsideData.units[key].ai) {
+            // console.log("hit ai", model.creeps.dog);s
+            ctx.drawImage(model.creeps.dog, outsideData.units[key].x - model.X + 500, outsideData.units[key].y - model.Y + 350, 136, 100);
           }
         }
       }
@@ -710,8 +841,7 @@ function drawData() {
   else {
     ctx.drawImage(model.dude, model.cX, model.cY, 100, 100);
   }
-
-}
+};
 
 function hitUnit(x, y, unit) {
   var xMin = outsideData.units[unit].x+50-(model.unitWidth/2);
@@ -722,11 +852,11 @@ function hitUnit(x, y, unit) {
     return true;
   }
   return false;
-}
+};
 
 function die() {
 
-}
+};
 
 function leftBound() {
   if(model.X-500 < 0)
@@ -734,13 +864,13 @@ function leftBound() {
   else {
     return parseInt((model.X-500)/100);
   }
-}
+};
 
 function rightBound() {
   if(parseInt((model.X+500)/100) + 2 > model.columns)
     return (model.columns);
   return parseInt((model.X+500)/100) + 2;
-}
+};
 
 function topBound() {
   if(model.Y-350 < 0)
@@ -748,13 +878,13 @@ function topBound() {
   else {
     return parseInt((model.Y-350)/100);
   }
-}
+};
 
 function bottomBound() {
   if(parseInt((model.Y+350)/100) + 2 > model.rows)
     return model.rows;
   return parseInt((model.Y+350)/100) + 2;
-}
+};
 
 function colorMap(callback) {
   for(let i=0; i<(model.rows); i++) {
@@ -769,7 +899,15 @@ function colorMap(callback) {
     }
   }
   callback();
-}
+};
+
+function gameWon(win) {
+  ctx.clearRect(0, 0, model.vWidth, model.vHeight);
+  ctx.fillStyle = 'white';
+  ctx.font = "30px Arial";
+  ctx.fillText("Game Won by: " + win.user,350,300);
+  ctx.fillText("Reset in: " + parseInt(win.reset/33), 350, 400);
+};
 
 const render = {
   setCtx: (ctxp) => {
@@ -779,7 +917,9 @@ const render = {
     outsideData = outsideDataP;
     renderActions();
     drawMap();
-  }
+  },
+  renderIdle: renderIdle,
+  gameWon: gameWon
 };
 
 module.exports = render;

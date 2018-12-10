@@ -24,41 +24,71 @@ $( function() {
   render.setCtx(ctx);
   model.dude.src = '/static/images/still.png';
   model.fDude.src = '/static/images/stillF.png';
+  model.creeps.dog = new Image();
+  model.creeps.dog.src = '/static/images/dog.png';
   model.id = docCookies.getItem('userId');
 
   socket.on('appData', function(msg){
-    // Emit your actions data
-    var data = { unit: {id: model.id, ll: model.flipped, up: actions.act.up, right: actions.act.right,
-       missles: actions.missles, alive: true, build: actions.build}, mapSet: mapSet };
-    socket.emit('appData', data);
-
-    // Reset if dead
-    if(msg.units[model.id].alive == false || resetWait > 1) {
-      resetWait = 0;
-      resetLoc();
+    // determine if timeout
+    if(msg.idle > 30) {
+      console.log("idle", msg.idle);
+      render.renderIdle();
     }
-    resetWait++;
+    else {
 
-    if(model.needsReset) {
-      resetLoc();
-    }
-
-    // Set map
-    if(msg.units != null) {
-      if(msg.setMap) {
-        model.MAP = msg.map;
-        mapSet = true;
-        model.columns = model.MAP.length;
-        model.rows = model.MAP[0].length;
+      // determine if game is won
+      if (msg.win && msg.win.won) {
+        render.gameWon(msg.win);
       }
+      else {
 
-      // Collect Data and render collected Data
-      clearData();
-      outsideData = msg;
-      render.render(outsideData);
+        // Emit your actions data
+        var data = { unit: {id: model.id, ll: model.flipped, up: actions.act.up, right: actions.act.right,
+           missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag}, mapSet: mapSet };
+        socket.emit('appData', data);
+
+        // Reset if dead
+        if(msg.units[model.id].alive == false || resetWait > 1) {
+          resetWait = 0;
+          resetLoc();
+        }
+        resetWait++;
+
+        if(model.needsReset) {
+          resetLoc();
+        }
+
+        // Set map
+        if(msg.units != null) {
+          if(msg.setMap) {
+            model.MAP = msg.map;
+            mapSet = true;
+            model.columns = model.MAP.length;
+            model.rows = model.MAP[0].length;
+          }
+
+          // Collect Data and render collected Data
+          clearData();
+          outsideData = msg;
+          render.render(outsideData);
+        }
+
+        // Update Flags
+        updateFlags(msg.flags);
+        // Detect Drain Flags
+        actions.detectFlag();
+      }
     }
   });
 });
+
+function updateFlags(flags) {
+  model.flags = flags;
+  flags.map( (flag, i) => {
+    model.MAP[flag.x][flag.y].h = flag.health;
+    model.MAP[flag.x][flag.y].o = flag.owner;
+  });
+}
 
 function setMapPart(x1, y1, x2, y2, mapPart) {
   for(let i=0; i<(y2-y1); i++) {
@@ -81,4 +111,5 @@ function resetLoc() {
 function clearData() {
   actions.missles = {};
   actions.build.type = 0;
+  actions.drainFlag = {};
 }

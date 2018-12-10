@@ -17,6 +17,7 @@ var model = {
   cY: (vHeight/2-50),
   dude: dude,
   fDude: fDude,
+  creeps: {},
   flipped: false,
   timeSet: Date.now(),    // unused?
   needsReset: true,
@@ -25,7 +26,8 @@ var model = {
   rows: 0,
   unitWidth: 60,
   unitHeight: 100,
-  id: 0
+  id: 0,
+  flags: []
 }
 
 module.exports = model;

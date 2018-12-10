@@ -1,5 +1,8 @@
 var express = require('express');
 var router = express.Router();
+const aiProfiles = require('../server/aiProfiles');
+const ai = require('../server/ai');
+var map = require('../server/map.js');
 
 
 router.post('/login/:email/:password', function(req, res) {
@@ -32,15 +35,32 @@ router.post('/logout', function(req, res) {
  */
 router.post('/adduser', function(req, res) {
   console.log("hit adduser");
-    var db = req.db;
-    console.log(req.body);
-    var collection = db.get('userlist');
-    collection.insert(req.body, function(err, result){
-        req.session.user = req.body.username;
-        res.send(
-            (err === null) ? { msg: '' } : { msg: err }
-        );
-    });
+  var db = req.db;
+  console.log(req.body);
+  var collection = db.get('userlist');
+  var newChar = {
+    x: 500,
+    y: 350,
+    ll: true,
+    right: 0,
+    up: 0,
+    health: 100,
+    timeout: 0,
+    alive: false,
+    loggedIn: true
+  }
+  newUser = req.body;
+  newUser.char = newChar;
+  collection.insert(newUser, function(err, result){
+      req.session.user = req.body.username;
+      res.send(
+          (err === null) ? { msg: '' } : { msg: err }
+      );
+  });
+  ai.new(aiProfiles.pet, db);
+
+  // add character to mapData
+  makeChar(req.body.username);
 })
 
 /*
@@ -130,4 +150,34 @@ router.post('/demo', function(req, res) {
     });
 });
 
-module.exports = router;
+function makeChar(id) {
+  map.mapData.units[id] = {
+    x: map.neutralSpawn.x || 0,
+    y: map.neutralSpawn.y || 0,
+    ll: true,
+    right: 0,
+    up: 0,
+    health: 100,
+    timeout: 0,
+    alive: false
+  }
+  makeAI(id + 'ai', id);
+}
+
+function makeAI(id, userid) {
+  console.log("made ai");
+  map.mapData.units[id] = {
+    owner: userid,
+    x: 500,
+    y: 350,
+    ll: true,
+    right: 0,
+    up: 0,
+    health: 100,
+    timeout: 0,
+    alive: true,
+    ai: true
+  }
+}
+
+module.exports = { router: router, makeChar: makeChar };

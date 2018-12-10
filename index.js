@@ -23,6 +23,9 @@ var cookieParser = require('cookie-parser');
 var RedisStore = require("connect-redis")(session);
 var map = require('./server/map.js');
 var users = require('./routes/users');
+var utils = require('./server/utility.js');
+var controller = require('./server/controller.js');
+var constants = require('./server/constants.js');
 
 
 app.use(bodyParser.json());
@@ -32,7 +35,6 @@ var sessionMiddleware = session({
     secret: 'samwise',
     resave: false,
     saveUninitialized: true
-    // store: new RedisStore()
 });
 io.use(function(socket, next) {
     sessionMiddleware(socket.request, socket.request.res, next);
@@ -49,23 +51,33 @@ app.use(function (req, res, next) {
 });
 
 // For login API
-app.use('/users', users);
+app.use('/users', users.router);
 
 // Global Variables
-var unitWidth = 60;
-var unitHeight = 100;
+const unitWidth = 60;
+const unitHeight = 100;
 var numConnected = 0;
 var alreadySending = false;
 const speed = 30;
-const damage = 30;
+const saveInterval = 900;
 var sAddresses = {};
+let charsLoaded = false;
+aiMade = false;
+const winPercentage = .6;
+const resetInterval = 300;
+let win = {won: false, user: "", reset: resetInterval};
 
 app.use(cookieParser());
 
 // set up static file serving from the public directory
 app.use('/static', express.static(__dirname + '/public'));
 
-map.readMap();
+// map.readMap().then( () => {
+//   map.insertDBMap(db);
+// });
+// map.readDBMap(db, 'game');
+map.readMap("game");
+
 // Setup Routing for main page
 app.get('/', function(req, res){
   if(!req.session.user) {
@@ -75,14 +87,24 @@ app.get('/', function(req, res){
   else {
     res.cookie('userId', req.session.user);
     res.cookie('MAP', map.map);
-    if(newChar(req.session.user)) {
-      makeChar(req.session.user);
-    };
+    if(!charsLoaded)
+      loadChars().then( () => {
+        loadAI().then( () => {
+          if(newChar(req.session.user)) {
+            users.makeChar(req.session.user);
+          };
+        });
+      });
+    else {
+      if(newChar(req.session.user)) {
+        users.makeChar(req.session.user);
+      };
+    }
     res.sendFile(__dirname + '/index.html');
   }
 });
 
-//  ------------------ mapData Format  ----------------------
+//  ------------------ map.mapData Format  ----------------------
 //  curId: int          -> specifies the next id to be created by new player
 //  units: {
 //   id: {              -> id of the units
@@ -109,27 +131,20 @@ app.get('/', function(req, res){
 //  map: map
 //  ----------------------------------------------------------
 
-
-// FORMATS
-// var hitsF = {sender: 0, missle: 0, unit: 0};
-var misslesF = {sender: 0, curX: 0, curY: 0, dX: 0, dY: 0, dist: 0, type: "A"}
-
-var mapData = {
-  curId: 0,
-  units: {},
-  curMId: 0,
-  missles: {},
-  setMap: true
-};
-// hits = [];
-
 io.on('connection', function(socket){
   let newClient = {socket: socket.id};
   pushIfNew(newClient);
+  socket.on('ai', function(data) {
+    ai.send(data);
+  })
+
   socket.on('appData', function(msg){
     // Set idle timeout
     if(sAddresses[socket.id]) {
       sAddresses[socket.id].idle = 0;
+      if(msg.unit.id) {
+        sAddresses[socket.id].unit = msg.unit.id;
+      }
 
       if(msg.mapSet) {
         sAddresses[socket.id].data.setMap = false;
@@ -139,32 +154,34 @@ io.on('connection', function(socket){
 
     // Need to validate data structure here for incoming data (msg)
     if(msg.unit.alive == true) {
-      if(mapData.units[msg.unit.id] != null) {
-        mapData.units[msg.unit.id].alive = true;
+      if(map.mapData.units[msg.unit.id] != null) {
+        map.mapData.units[msg.unit.id].alive = true;
       }
     }
 
-    if(mapData.units[msg.unit.id] == null) {
-      mapData.units[msg.unit.id] = msg.unit;
-      mapData.units[msg.unit.id].missles.timeout = 0;
+    // add unit to map data if not there
+    if(map.mapData.units[msg.unit.id] == null) {
+      map.mapData.units[msg.unit.id] = msg.unit;
+      map.mapData.units[msg.unit.id].missles.timeout = 0;
     }
 
-    mapData.units[msg.unit.id].up= msg.unit.up;
-    mapData.units[msg.unit.id].right = msg.unit.right
-    mapData.units[msg.unit.id].ll = msg.unit.ll;
-    mapData.units[msg.unit.id].loggedIn = true;
+    map.mapData.units[msg.unit.id].up = msg.unit.up;
+    map.mapData.units[msg.unit.id].right = msg.unit.right
+    map.mapData.units[msg.unit.id].ll = msg.unit.ll;
+    map.mapData.units[msg.unit.id].loggedIn = true;
+    map.mapData.units[msg.unit.id].drainFlag = msg.unit.drainFlag;
 
     // Add a missle if there
     if(msg.unit.missles == undefined) {
-      mapData.units[msg.unit.id].missles = {};
+      map.mapData.units[msg.unit.id].missles = {};
     }
     else {
-      shoot(msg);
+      controller.shoot(msg);
     }
 
     // if building add a wall
     if(msg.unit.build.type != 0) {
-      build(msg);
+      controller.build(msg);
     }
 
     // TODO: Push hit checking to the front end and validate here
@@ -180,32 +197,87 @@ io.on('connection', function(socket){
   batchSend(socket);
 });
 
+function checkWinCondition() {
+  let leadUsers = {};
+  let leadUser = "";
+  let leadingAmount = 0;
+  map.mapData.flags.map( (flag, i) => {
+    if (flag.owner != null && flag.owner != "") {
+      if (leadUsers[flag.owner]) {
+        leadUsers[flag.owner]++;
+      }
+      else {
+        leadUsers[flag.owner] = 1;
+      }
+      if (leadUsers[flag.owner] > leadingAmount) {
+        leadingAmount = leadUsers[flag.owner];
+        leadUser = flag.owner;
+      }
+    }
+  });
+  if(leadingAmount > (map.mapData.flags.length * winPercentage)) {
+    win.won = true;
+    win.user = leadUser;
+  }
+};
+
 // Should try to see if map is different before sending as well to avoid extra emits
 // Also should try to send different data depending on the person
 function batchSend(socket) {
+  let count = 0;
   pushIfNew(socket.id);
   if(!alreadySending) {
     setInterval(() => {
       if(numConnected > 0) {
-        processData();
+        count++;
+        if(count >= saveInterval) {
+          count = 0;
+          saveActive();
+        }
+        // Process data once per iteration
+        controller.processData();
+        // Check win conditions once per iteration
+        checkWinCondition();
 
+        if(win.won) {
+          if(win.reset > 0) {
+            win.reset--;
+          }
+          else {
+            reset();
+          }
+        }
         // JSON method
         var keys = Object.keys(sAddresses);
         for(let j=0;j<keys.length;j++) {
           var key = keys[j];
-          sAddresses[key].idle++;
-          sAddresses[key].data.units = mapData.units;
-          sAddresses[key].data.missles = mapData.missles;
-          sAddresses[key].data.builds = mapData.builds;
-          io.to(key).emit('appData', sAddresses[key].data);
-          delete sAddresses[key].data.builds;
-          if(sAddresses[key] != null) {
-            if(sAddresses[key].idle > 30) {
-              delete sAddresses[key];
+          if (win.won) {
+            sAddresses[key].data.win = win;
+            sAddresses[key].idle = 0;
+            io.to(key).emit('appData', sAddresses[key].data);
+          }
+          else {
+            sAddresses[key].idle++;
+            // if(map.mapData.units && map.mapData.units[sAddresses[key].unit]) {
+            //   if(map.mapData.units[sAddresses[key].unit].idle)
+            //     map.mapData.units[sAddresses[key].unit].idle++;
+            //   else map.mapData.units[sAddresses[key].unit].idle = 0;
+            // }
+            sAddresses[key].data.units = map.mapData.units;
+            sAddresses[key].data.missles = map.mapData.missles;
+            sAddresses[key].data.builds = map.mapData.builds;
+            sAddresses[key].data.idle = sAddresses[key].idle;
+            sAddresses[key].data.flags = map.mapData.flags;
+            io.to(key).emit('appData', sAddresses[key].data);
+            delete sAddresses[key].data.builds;
+            if(sAddresses[key] != null) {
+              if(sAddresses[key].idle > 30) { // Need to determine good logout timeperiod
+                // delete map.mapData.units[sAddresses[key].unit];
+                delete sAddresses[key];
+              }
             }
           }
         }
-
       };
     }, speed);
     alreadySending = true;
@@ -217,198 +289,61 @@ function pushIfNew(socket) {
     sAddresses[socket] = {data: {map: map.map, setMap: true}, idle: 0};
 }
 
-function processData() {
-  // needs to test hits sent from front ends
-
-  if(mapData.units != null) {
-    var keys = Object.keys(mapData.units);
-    for(var i=0;i<keys.length;i++){
-      var key = keys[i];
-
-      // Only look at units currently logged in
-      if(mapData.units[key].loggedIn == true) {
-
-        // Process hits
-        var keys2 = Object.keys(mapData.missles);
-        for(let j=0; j<keys2.length; j++) {
-          var key2 = keys2[j];
-          var missle = mapData.missles[key2];
-          if(validate(misslesF, missle)) {
-            if(missle.sender != key) {
-              if(hitUnit(missle.curX, missle.curY, mapData.units[key])) {
-                delete mapData.missles[key2];
-                mapData.units[key].health -= damage;
-                if(mapData.units[key].health < 0) {
-                  die(key);
-                }
-              }
-            }
-          }
-        }
-
-        // Process units
-        let beforeX = mapData.units[key].x;
-        if(canGo(mapData.units[key].x + mapData.units[key].right, mapData.units[key].y)) {
-          mapData.units[key].x += mapData.units[key].right;
-        }
-        if(canGo(beforeX, mapData.units[key].y - mapData.units[key].up)) {
-          mapData.units[key].y -= mapData.units[key].up;
-        }
-      }
-    }
-  }
-
-  // Process Missles
-  if(mapData.missles != null) {
-    var keys = Object.keys(mapData.missles);
-    for(let j=0;j<keys.length;j++) {
-      var key = keys[j];
-      if(mapData.missles[key].curX != null) {
-        var missle = mapData.missles[key];
-        mapData.missles[key].curX = missle.curX + missle.dX;
-        mapData.missles[key].curY = missle.curY + missle.dY;
-        mapData.missles[key].dist++;
-        if( mapData.missles[key].dist > 30 || hitWall(mapData.missles[key].curX, mapData.missles[key].curY)) {
-          delete mapData.missles[key];
-        }
-      }
-    }
-  }
-
-}
-
-function hitUnit(x, y, unit) {
-  if(unit.x != null) {
-    var xMin = unit.x+50-(unitWidth/2);
-    var xMax = unit.x+50+(unitWidth/2);
-    var yMin = unit.y+50-(unitHeight/2);
-    var yMax = unit.y+50+(unitHeight/2);
-    if(x > xMin && x < xMax && y > yMin && y < yMax) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function hitWall(iX, iY) {
-  if(map.map[parseInt(iX/100)][parseInt(iY/100)] == 0) {
-    return false;
-  }
-  if(map.map[parseInt(iX/100)][parseInt(iY/100)].type == 3) {
-    return false;
-  }
-  return true;
-}
-
-function die(unit) {
-  mapData.units[unit] = {
-    x: 500,
-    y: 350,
-    ll: true,
-    right: 0,
-    up: 0,
-    health: 100,
-    timeout: 0,
-    alive: false,
-    loggedIn: true
-  };
-}
-
-// If all four corners are clear return true, else false
-function canGo(iX, iY) {
-  if(isClear(map.map[parseInt((iX+20)/100)][parseInt(iY/100)])
-  && isClear(map.map[parseInt((iX+20)/100)][parseInt((iY+99)/100)])
-  && isClear(map.map[parseInt((iX+80)/100)][parseInt((iY)/100)])
-  && isClear(map.map[parseInt((iX+80)/100)][parseInt((iY+99)/100)])) {
-    return true;
-  }
-  return false;
-}
-
-function isClear(tile) {
-  if(tile == 0)
-    return true;
-  if(tile.type == 3)
-    return true;
-  return false;
-}
-
-function makeChar(id) {
-  mapData.units[id] = {
-    x: 500,
-    y: 350,
-    ll: true,
-    right: 0,
-    up: 0,
-    health: 100,
-    timeout: 0,
-    alive: false
-  }
-}
-
 function newChar(id) {
-  if(mapData.units[id] != null) {
+  if(map.mapData.units[id] != null) {
     return false;
   }
   return true;
 }
 
-function shoot(msg) {
+function lookupChar(id) {
+  var collection = db.get('userlist');
+  collection.find({id: id}, function(err, result){
+  });
+}
 
-  // first check timeout
-  if(mapData.units[msg.unit.id].timeout < 1) {
+function loadChars() {
+  return new Promise( function(resolve, reject) {
+    charsLoaded = true;
+    var collection = db.get('userlist');
+    collection.find({} , function(err, result){
+      result.map((unit) => {
+        map.mapData.units[unit.username] = unit.char;
+      });
+      resolve(map.mapData.units);
+    });
+  });
+}
 
-    // Then look through missles
-    var keys = Object.keys(msg.unit.missles);
-    for(var i=0;i<keys.length;i++){
-      var key = keys[i];
-      // if theres a new missle
-      if(msg.unit.missles[key].shooting) {
-        // add the new missle to the json
-        mapData.curMId++;
-        let aMissle = {
-          sender: msg.unit.id,
-          curX: mapData.units[msg.unit.id].x + 50,
-          curY: mapData.units[msg.unit.id].y + 50,
-          dX: msg.unit.missles[key].dX,
-          dY: msg.unit.missles[key].dY,
-          dist: 0,
-          type: msg.unit.missles[key].type
-        };
-        mapData.missles[mapData.curMId] = aMissle;
-        mapData.units[msg.unit.id].timeout = 30;
-      }
-    }
-  }
-  else {
-    mapData.units[msg.unit.id].timeout--;
+function loadAI() {
+  return new Promise( function(resolve, reject) {
+    aiLoaded = true;
+    var collection = db.get('ai');
+    collection.find({} , function(err, result){
+      result.map((unit) => {
+        map.mapData.units[unit.username] = unit.char;
+      });
+      resolve(map.mapData.units);
+    });
+  });
+}
+
+function saveActive() {
+  var collection = db.get('userlist');
+  var keys = Object.keys(map.mapData.units);
+  for(let i=0; i<keys.length; i++) {
+    let key = keys[i];
+    collection.update( {username: key}, { $set: { char: map.mapData.units[key] } } );
   }
 }
 
-function build(msg) {
-  map.change(msg.unit.build.type, msg.unit.build.x, msg.unit.build.y);
-  console.log(msg.unit.build.type);
-  mapData.builds = {type: msg.unit.build.type, x: msg.unit.build.x, y: msg.unit.build.y};
-}
+function spawn(user) {
 
-function validate(format, input) {
-  if(input == undefined) {
-    return false;
-  }
-  var keys = Object.keys(format);
-  for(var i=0;i<keys.length;i++){
-    var key = keys[i];
-    if(input[key] == null) {
-      return false;
-    }
-    else {
-      if(typeof format[key] === 'object') {
-        if(!validate(format[key], input[key]))
-          return false;
-      }
-    }
-  }
-  return true;
-}
+};
 
-module.exports = app;
+function reset() {
+  controller.resetUnits();
+  map.readMap("game").then( () => {
+    win = {won: false, user: "", reset: resetInterval};
+  });
+};
