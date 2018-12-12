@@ -12,6 +12,7 @@ $(document).ready(function() {
 
 // LOGIN
 function login(event) {
+  event.preventDefault();
   // First do Password Check
   var email = $('#loginEmail').val();
   var pw = $('#loginPassword').val();

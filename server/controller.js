@@ -66,7 +66,9 @@ function processUnits() {
 
           // Add any flag Drains
           if(theUnit.drainFlag) {
-            flagDrains.push(theUnit.drainFlag);
+            if(validFlagDrain(theUnit)) {
+              flagDrains.push(theUnit.drainFlag);
+            }
           }
         }
         // Process AI
@@ -76,6 +78,17 @@ function processUnits() {
       }
     }
   }
+}
+
+function validFlagDrain(theUnit) {
+  if(!theUnit.drainFlag)
+    return false;
+  const flag = map.mapData.flags[theUnit.drainFlag.id];
+  if(!flag)
+    return false;
+  if(utils.dist(theUnit.x+50, theUnit.y+80, flag.x*100+50, flag.y*100+50) < 60)
+    return true;
+  else return false;
 }
 
 function valid(unit) {

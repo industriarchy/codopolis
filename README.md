@@ -10,6 +10,17 @@ I'd like to start everything with a simple "Battle Mode" in which each player wi
 All Data is passed via JSON through Socket.io from client to server vice/versa. This might be better handled in the future with javascript blobs.
 
 The server will store user data with mongodb.
+
+Upload:
+scp corCodopolis.zip motivey.com:/
+ssh motivey.com
+unzip corCodpolis
+
+Deploy:
+database: sudo mongod --fork --logpath /var/log/mongodb.log --dbpath data
+use pm2:
+  pm2 start index.js
+
 <pre>
   ------------------ Model Data Format  ----------------------
   curId: int          -> specifies the next id to be created by new player

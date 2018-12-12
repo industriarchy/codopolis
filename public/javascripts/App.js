@@ -17,9 +17,7 @@ var mapSet = false;
 var resetWait = 0;
 
 $( function() {
-
   c = document.getElementById("theView");
-  actions.assignListeners(c);
   ctx = c.getContext("2d");
   render.setCtx(ctx);
   model.dude.src = '/static/images/still.png';
@@ -27,7 +25,12 @@ $( function() {
   model.creeps.dog = new Image();
   model.creeps.dog.src = '/static/images/dog.png';
   model.id = docCookies.getItem('userId');
+  actions.assignListeners(c).then( () => {
+    listenSocket();
+  });
+});
 
+function listenSocket() {
   socket.on('appData', function(msg){
     // determine if timeout
     if(msg.idle > 30) {
@@ -41,7 +44,6 @@ $( function() {
         render.gameWon(msg.win);
       }
       else {
-
         // Emit your actions data
         var data = { unit: {id: model.id, ll: model.flipped, up: actions.act.up, right: actions.act.right,
            missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag}, mapSet: mapSet };
@@ -80,7 +82,7 @@ $( function() {
       }
     }
   });
-});
+}
 
 function updateFlags(flags) {
   model.flags = flags;

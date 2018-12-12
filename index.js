@@ -25,7 +25,7 @@ var map = require('./server/map.js');
 var users = require('./routes/users');
 var utils = require('./server/utility.js');
 var controller = require('./server/controller.js');
-var constants = require('./server/constants.js');
+const CONSTANTS = require('./server/constants.js');
 
 
 app.use(bodyParser.json());
@@ -54,18 +54,12 @@ app.use(function (req, res, next) {
 app.use('/users', users.router);
 
 // Global Variables
-const unitWidth = 60;
-const unitHeight = 100;
 var numConnected = 0;
 var alreadySending = false;
-const speed = 30;
-const saveInterval = 900;
 var sAddresses = {};
 let charsLoaded = false;
 aiMade = false;
-const winPercentage = .6;
-const resetInterval = 300;
-let win = {won: false, user: "", reset: resetInterval};
+let win = {won: false, user: "", reset: CONSTANTS.RESETINTERVAL};
 
 app.use(cookieParser());
 
@@ -123,8 +117,8 @@ app.get('/', function(req, res){
 //      sender: int     -> id of the sender
 //      curX: int       -> current x-coord
 //      curY: int       -> current y-coord
-//      dX: int         -> travel speed x
-//      dY: int         -> travel speed y
+//      dX: int         -> travel CONSTANTS.SPEED x
+//      dY: int         -> travel CONSTANTS.SPEED y
 //      dist: int       -> distance traveled so far
 //      type: string    -> projectile type
 //    },
@@ -156,6 +150,9 @@ io.on('connection', function(socket){
     if(msg.unit.alive == true) {
       if(map.mapData.units[msg.unit.id] != null) {
         map.mapData.units[msg.unit.id].alive = true;
+      }
+      else {
+        console.log("unit nulled", msg.unit);
       }
     }
 
@@ -215,7 +212,7 @@ function checkWinCondition() {
       }
     }
   });
-  if(leadingAmount > (map.mapData.flags.length * winPercentage)) {
+  if(leadingAmount > (map.mapData.flags.length * CONSTANTS.WINPERCENTAGE)) {
     win.won = true;
     win.user = leadUser;
   }
@@ -228,9 +225,10 @@ function batchSend(socket) {
   pushIfNew(socket.id);
   if(!alreadySending) {
     setInterval(() => {
+      // console.log(map.mapData);
       if(numConnected > 0) {
         count++;
-        if(count >= saveInterval) {
+        if(count >= CONSTANTS.SAVEINTERVAL) {
           count = 0;
           saveActive();
         }
@@ -251,8 +249,8 @@ function batchSend(socket) {
         var keys = Object.keys(sAddresses);
         for(let j=0;j<keys.length;j++) {
           var key = keys[j];
+          sAddresses[key].data.win = win;
           if (win.won) {
-            sAddresses[key].data.win = win;
             sAddresses[key].idle = 0;
             io.to(key).emit('appData', sAddresses[key].data);
           }
@@ -279,7 +277,7 @@ function batchSend(socket) {
           }
         }
       };
-    }, speed);
+    }, CONSTANTS.SPEED);
     alreadySending = true;
   }
 }
@@ -344,6 +342,6 @@ function spawn(user) {
 function reset() {
   controller.resetUnits();
   map.readMap("game").then( () => {
-    win = {won: false, user: "", reset: resetInterval};
+    win = {won: false, user: "", reset: CONSTANTS.RESETINTERVAL};
   });
 };

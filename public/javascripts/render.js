@@ -419,7 +419,7 @@ function gameWon(win) {
   ctx.fillStyle = 'white';
   ctx.font = "30px Arial";
   ctx.fillText("Game Won by: " + win.user,350,300);
-  ctx.fillText("Reset in: " + parseInt(win.reset/33), 350, 400);
+  ctx.fillText("Reset in: " + parseInt(win.reset/33 + 1), 350, 400);
 };
 
 const render = {

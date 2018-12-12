@@ -18,9 +18,7 @@ var mapSet = false;
 var resetWait = 0;
 
 $( function() {
-
   c = document.getElementById("theView");
-  actions.assignListeners(c);
   ctx = c.getContext("2d");
   render.setCtx(ctx);
   model.dude.src = '/static/images/still.png';
@@ -28,7 +26,12 @@ $( function() {
   model.creeps.dog = new Image();
   model.creeps.dog.src = '/static/images/dog.png';
   model.id = docCookies.getItem('userId');
+  actions.assignListeners(c).then( () => {
+    listenSocket();
+  });
+});
 
+function listenSocket() {
   socket.on('appData', function(msg){
     // determine if timeout
     if(msg.idle > 30) {
@@ -42,7 +45,6 @@ $( function() {
         render.gameWon(msg.win);
       }
       else {
-
         // Emit your actions data
         var data = { unit: {id: model.id, ll: model.flipped, up: actions.act.up, right: actions.act.right,
            missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag}, mapSet: mapSet };
@@ -81,7 +83,7 @@ $( function() {
       }
     }
   });
-});
+}
 
 function updateFlags(flags) {
   model.flags = flags;
@@ -162,7 +164,6 @@ function endDrag(e) {
 };
 
 function dragging(e) {
-  console.log(pointing);
   if(pointing) {
     eX = e.changedTouches[0].pageX;
     eY = e.changedTouches[0].pageY;
@@ -274,9 +275,6 @@ function detectFlag() {
       }
       actions.drainFlag = { flag: model.flags[i], id: i};
     }
-    else {
-      // console.log("dist is", utils.dist(model.X, model.Y, flag.x*100+50, flag.y*100+50));
-    }
   });
 }
 
@@ -284,54 +282,56 @@ function detectFlag() {
 var actions = {
 
   assignListeners: function(c) {
-    document.getElementById("logout").addEventListener("click", logout);
-    c.addEventListener('click', (event) => {
-      var clickX = event.offsetX;
-      var clickY = event.offsetY;
-      if(actions.placingF) {
-        placeFence(clickX, clickY);
-      }
-      else {
-        shoot(clickX, clickY);
-      }
-    });
-    c.addEventListener('touchstart', (event) => {
-      initiateDrag(event);
-    });
-    c.addEventListener('touchend', (event) => {
-      endDrag(event);
-    });
-    c.addEventListener('touchmove', (event) => {
-      dragging(event);
-    });
-    c.addEventListener('mousemove', (event) => {
-      actions.mouse = event;
-    });
+    return new Promise( function(resolve, reject) {
+      document.getElementById("logout").addEventListener("click", logout);
+      c.addEventListener('click', (event) => {
+        var clickX = event.offsetX;
+        var clickY = event.offsetY;
+        if(actions.placingF) {
+          placeFence(clickX, clickY);
+        }
+        else {
+          shoot(clickX, clickY);
+        }
+      });
+      c.addEventListener('touchstart', (event) => {
+        initiateDrag(event);
+      });
+      c.addEventListener('touchend', (event) => {
+        endDrag(event);
+      });
+      c.addEventListener('touchmove', (event) => {
+        dragging(event);
+      });
+      c.addEventListener('mousemove', (event) => {
+        actions.mouse = event;
+      });
+      document.addEventListener('keydown', (event) => {
+        const keyName = event.key;
+        if(keyName == "w") {
+          goUp();
+        }
+        if(keyName == "s") {
+          goDown();
+        }
+        if(keyName == "d") {
+          goRight();
+        }
+        if(keyName == "a") {
+          goLeft();
+        }
+        if(keyName == "f") {
+          actions.placingF = !actions.placingF;
+        }
+      });
 
-    document.addEventListener('keydown', (event) => {
-      const keyName = event.key;
-      if(keyName == "w") {
-        goUp();
-      }
-      if(keyName == "s") {
-        goDown();
-      }
-      if(keyName == "d") {
-        goRight();
-      }
-      if(keyName == "a") {
-        goLeft();
-      }
-      if(keyName == "f") {
-        actions.placingF = !actions.placingF;
-      }
-    });
-
-    document.addEventListener('keyup', (event) => {
-      if(event.key == "w" || event.key == "s")
-        actions.act.up = 0;
-      if(event.key == "a" || event.key == "d")
-        actions.act.right = 0;
+      var a = document.addEventListener('keyup', (event) => {
+        if(event.key == "w" || event.key == "s")
+          actions.act.up = 0;
+        if(event.key == "a" || event.key == "d")
+          actions.act.right = 0;
+      });
+      resolve(a);
     });
   },
   act: {                           // actions
@@ -906,7 +906,7 @@ function gameWon(win) {
   ctx.fillStyle = 'white';
   ctx.font = "30px Arial";
   ctx.fillText("Game Won by: " + win.user,350,300);
-  ctx.fillText("Reset in: " + parseInt(win.reset/33), 350, 400);
+  ctx.fillText("Reset in: " + parseInt(win.reset/33 + 1), 350, 400);
 };
 
 const render = {

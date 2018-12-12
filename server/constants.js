@@ -1,6 +1,6 @@
 const CONSTANTS = {
-  unitWidth: 60,
-  unitHeight:100,
+  UNITWIDTH: 60,
+  UNITHEIGHT:100,
   SPEED: 30,
   SAVEINTERVAL: 900,
   WINPERCENTAGE: .6,
