@@ -10,7 +10,8 @@ let fDude = new Image();
 var model = {
   X: 500,
   Y: 350,
-  s: 5,                 // Constant that defines the change in distance per action
+  s: 15,                 // Constant that defines the change in distance per action
+  p: 90,                // Constant that defines period for the speed
   vWidth: vWidth,
   vHeight: vHeight,
   cX: (vWidth/2-50),
@@ -27,7 +28,9 @@ var model = {
   unitWidth: 60,
   unitHeight: 100,
   id: 0,
-  flags: []
+  flags: [],
+  units: {},
+  missles: {}
 }
 
 module.exports = model;

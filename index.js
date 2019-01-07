@@ -25,7 +25,7 @@ var map = require('./server/map.js');
 var users = require('./routes/users');
 var utils = require('./server/utility.js');
 var controller = require('./server/controller.js');
-const CONSTANTS = require('./server/constants.js');
+const CONSTANTS = require('./shared/constants.js');
 
 
 app.use(bodyParser.json());
@@ -163,7 +163,9 @@ io.on('connection', function(socket){
     }
 
     map.mapData.units[msg.unit.id].up = msg.unit.up;
-    map.mapData.units[msg.unit.id].right = msg.unit.right
+    map.mapData.units[msg.unit.id].right = msg.unit.right;
+    map.mapData.units[msg.unit.id].newX = msg.unit.newX;
+    map.mapData.units[msg.unit.id].newY = msg.unit.newY;
     map.mapData.units[msg.unit.id].ll = msg.unit.ll;
     map.mapData.units[msg.unit.id].loggedIn = true;
     map.mapData.units[msg.unit.id].drainFlag = msg.unit.drainFlag;

@@ -16,6 +16,9 @@ var outsideData;
 var hits = {};
 var mapSet = false;
 var resetWait = 0;
+let previousTick = Date.now();
+let actualTicks = 0;
+const tickLengthMs = 1000 / 30;
 
 $( function() {
   c = document.getElementById("theView");
@@ -26,10 +29,36 @@ $( function() {
   model.creeps.dog = new Image();
   model.creeps.dog.src = '/static/images/dog.png';
   model.id = docCookies.getItem('userId');
+
   actions.assignListeners(c).then( () => {
     listenSocket();
+    socket.on('message', (msg) => {
+      console.log('mesage', msg);
+    })
+    gameLoop();
   });
 });
+
+const gameLoop = () => {
+  let now = Date.now();
+  if (previousTick + tickLengthMs <= now) {
+    let delta = (now - previousTick);
+    previousTick = now;
+    update(delta);
+    actualTicks = 0;
+  }
+  setTimeout(gameLoop, 0);
+};
+
+const update = (delta) => {
+  // Collect Data and render collected Data
+  actions.performActions(delta);
+  render.render(outsideData);
+  // Update Flags
+  // updateFlags(msg.flags);
+  // Detect Drain Flags
+  actions.detectFlag();
+}
 
 function listenSocket() {
   socket.on('appData', function(msg){
@@ -46,16 +75,16 @@ function listenSocket() {
       }
       else {
         // Emit your actions data
-        var data = { unit: {id: model.id, ll: model.flipped, up: actions.act.up, right: actions.act.right,
+        var data = { unit: {id: model.id, ll: model.flipped, up: actions.act.up, right: actions.act.right, newX: model.X, newY: model.Y,
            missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag}, mapSet: mapSet };
         socket.emit('appData', data);
 
         // Reset if dead
-        if(msg.units[model.id].alive == false || resetWait > 1) {
-          resetWait = 0;
-          resetLoc();
-        }
-        resetWait++;
+        // if(msg.units[model.id].alive == false || resetWait > 1) {
+        //   resetWait = 0;
+        //   resetLoc();
+        // }
+        // resetWait++;
 
         if(model.needsReset) {
           resetLoc();
@@ -73,13 +102,17 @@ function listenSocket() {
           // Collect Data and render collected Data
           clearData();
           outsideData = msg;
-          render.render(outsideData);
+          model.units = msg.units;
+          model.missles = msg.missles;
         }
-
-        // Update Flags
+        //
+        // // Update Flags
         updateFlags(msg.flags);
-        // Detect Drain Flags
-        actions.detectFlag();
+        // // Detect Drain Flags
+        // actions.detectFlag();
+        if(msg.units[model.id].resetLoc) {
+          model.needsReset = true;
+        }
       }
     }
   });
@@ -125,12 +158,17 @@ function clearData() {
 var utils = require('./utility');
 var model = require('./model');
 var docCookies = require('./cookies');
+const functions = require('../../shared/functions.js');
+const CONSTANTS = require('../../shared/constants.js');
 
 var mouse;
 var sX, sY, eX, eY;
+var socket = io();
 
 function goUp() {
   actions.act.up = model.s;
+  console.log("sending message");
+  socket.emit('message', "a message!");
 };
 
 function goDown() {
@@ -179,8 +217,8 @@ function shoot(x2, y2) {
   let aMissle = {
    curX: model.X+50,
    curY: model.Y+50,
-   dX: diff.x * 15,
-   dY: diff.y * 15,
+   dX: diff.x * CONSTANTS.MISSLESPEED,
+   dY: diff.y * CONSTANTS.MISSLESPEED,
    dist: 0,
    type: "A",
    shooting: true
@@ -278,6 +316,54 @@ function detectFlag() {
   });
 }
 
+function performActions(delta) {
+  let percentage = delta / model.p;
+  let beforeX = model.X;
+  let dX = actions.act.right * percentage;
+  let dY = actions.act.up * percentage;
+  if(actions.act.right != 0) {
+    if(functions.canGo(model.X + dX, model.Y, 20, 80, model.MAP)) {
+      model.X += dX;
+    }
+  }
+  if(actions.act.up != 0) {
+    if(functions.canGo(beforeX, model.Y - dY, 20, 80, model.MAP)) {
+      model.Y -= dY
+    }
+  }
+  if(actions.act.right < 0) {
+    model.flipped = true;
+  }
+  if(actions.act.right > 0) {
+    model.flipped = false;
+  }
+  // Move  missles
+  processMissles(percentage);
+
+};
+
+
+function processMissles(percentage) {
+  model.missles = functions.processMissles(model.missles, model.MAP, percentage);
+}
+
+// If all four corners are clear return true, else false
+// function canGo(iX, iY) {
+//   if(isClear(model.MAP[parseInt((iX+20)/100)][parseInt(iY/100)])
+//   && isClear(model.MAP[parseInt((iX+20)/100)][parseInt((iY+99)/100)])
+//   && isClear(model.MAP[parseInt((iX+80)/100)][parseInt((iY)/100)])
+//   && isClear(model.MAP[parseInt((iX+80)/100)][parseInt((iY+99)/100)])) {
+//     return true;
+//   }
+//   return false;
+// };
+//
+// function isClear(tile) {
+//   if((tile.t == 0 || tile.t == 3 || tile.y == 7) && tile.a != 2)
+//     return true;
+//   return false;
+// };
+
 // Export functions
 var actions = {
 
@@ -334,6 +420,7 @@ var actions = {
       resolve(a);
     });
   },
+  performActions: performActions,
   act: {                           // actions
     up: 0,
     right: 0,
@@ -354,7 +441,7 @@ var actions = {
 
 module.exports = actions;
 
-},{"./cookies":3,"./model":4,"./utility":6}],3:[function(require,module,exports){
+},{"../../shared/constants.js":7,"../../shared/functions.js":8,"./cookies":3,"./model":4,"./utility":6}],3:[function(require,module,exports){
 var docCookies = {
   getItem: function (name) {
     nameEQ = name + "=";
@@ -462,7 +549,8 @@ let fDude = new Image();
 var model = {
   X: 500,
   Y: 350,
-  s: 5,                 // Constant that defines the change in distance per action
+  s: 15,                 // Constant that defines the change in distance per action
+  p: 90,                // Constant that defines period for the speed
   vWidth: vWidth,
   vHeight: vHeight,
   cX: (vWidth/2-50),
@@ -479,7 +567,9 @@ var model = {
   unitWidth: 60,
   unitHeight: 100,
   id: 0,
-  flags: []
+  flags: [],
+  units: {},
+  missles: {}
 }
 
 module.exports = model;
@@ -500,47 +590,6 @@ function renderIdle() {
   ctx.fillStyle = 'white';
   ctx.font = "30px Arial";
   ctx.fillText("Idled out, please refresh page",350,300);
-};
-
-// This is for client-side rendering (for personal action to be smoother/quicker)
-function renderActions() {
-
-  ctx.clearRect(0, 0, model.vWidth, model.vHeight);
-
-  let beforeX = model.X;
-  if(actions.act.right != 0) {
-    if(canGo(model.X+actions.act.right, model.Y)) {
-      model.X+= actions.act.right;
-    }
-  }
-  if(actions.act.up != 0) {
-    if(canGo(beforeX, model.Y-actions.act.up)) {
-      model.Y-=actions.act.up;
-    }
-  }
-  if(actions.act.right < 0) {
-    model.flipped = true;
-  }
-  if(actions.act.right > 0) {
-    model.flipped = false;
-  }
-};
-
-// If all four corners are clear return true, else false
-function canGo(iX, iY) {
-  if(isClear(model.MAP[parseInt((iX+20)/100)][parseInt(iY/100)])
-  && isClear(model.MAP[parseInt((iX+20)/100)][parseInt((iY+99)/100)])
-  && isClear(model.MAP[parseInt((iX+80)/100)][parseInt((iY)/100)])
-  && isClear(model.MAP[parseInt((iX+80)/100)][parseInt((iY+99)/100)])) {
-    return true;
-  }
-  return false;
-};
-
-function isClear(tile) {
-  if((tile.t == 0 || tile.t == 3 || tile.y == 7) && tile.a != 2)
-    return true;
-  return false;
 };
 
 function drawMap() {
@@ -673,7 +722,7 @@ function mouseInside(x1, x2, y1, y2) {
 
 function grassTile(x, y) {
   ctx.fillStyle = '#5a2';
-  ctx.fillRect(x,y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
   ctx.beginPath();
   ctx.moveTo(x+10, y+10);
   ctx.lineTo(x+20, y+30);
@@ -684,37 +733,37 @@ function grassTile(x, y) {
 
 function waterTile(x, y) {
   ctx.fillStyle = '#57a';
-  ctx.fillRect(x,y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
 };
 
 function waterTileb(x, y) {
   ctx.fillStyle = '#469';
-  ctx.fillRect(x,y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
 };
 
 function blankTile(x, y) {
   ctx.fillStyle = '#333';
-  ctx.fillRect(x,y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
 };
 
 function pathTile(x, y) {
   ctx.fillStyle = '#9a6';
-  ctx.fillRect(x,y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
 };
 
 function wallTile(x, y) {
   ctx.fillStyle = '#aaa';
-  ctx.fillRect(x, y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
 };
 
 function rampY(x, y) {
   ctx.fillStyle = '#5a2';
-  ctx.fillRect(x,y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
 };
 
 function rampX(x, y) {
   ctx.fillStyle = '#5a2';
-  ctx.fillRect(x,y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
 };
 
 function smallTree(x, y) {
@@ -765,27 +814,27 @@ function drawData() {
   if(outsideData != null) {
 
     // Draw the Players
-    if(outsideData.units != null) {
-      var keys = Object.keys(outsideData.units);
+    if(model.units != null) {
+      var keys = Object.keys(model.units);
       for(var i=0;i<keys.length;i++){
         var key= keys[i];
 
         // check if unit is logged in
-        if(outsideData.units[key]) {
-          if(outsideData.units[key].loggedIn) {
+        if(model.units[key]) {
+          if(model.units[key].loggedIn) {
             if(key != model.id) {
-              if(outsideData.units[key].ll) {
-                ctx.drawImage(model.fDude, outsideData.units[key].x - model.X + 500, outsideData.units[key].y - model.Y + 350, 100, 100);
+              if(model.units[key].ll) {
+                ctx.drawImage(model.fDude, model.units[key].x - model.X + 500, model.units[key].y - model.Y + 350, 100, 100);
               }
               else {
-                ctx.drawImage(model.dude, outsideData.units[key].x - model.X + 500, outsideData.units[key].y - model.Y + 350, 100, 100);
+                ctx.drawImage(model.dude, model.units[key].x - model.X + 500, model.units[key].y - model.Y + 350, 100, 100);
               }
               ctx.fillStyle = '#a32';
-              ctx.fillRect(outsideData.units[key].x+24 - model.X + 500,outsideData.units[key].y-15 - model.Y + 350,outsideData.units[key].health/2, 5);
+              ctx.fillRect(model.units[key].x+24 - model.X + 500,model.units[key].y-15 - model.Y + 350,model.units[key].health/2, 5);
             }
 
             //Check for hit
-            var myMissles = outsideData.missles;
+            var myMissles = model.missles;
             hits = {};
             if(myMissles != null && key != model.id) {
               var keys2 = Object.keys(myMissles);
@@ -802,20 +851,20 @@ function drawData() {
               }
             }
           }
-          else if(outsideData.units[key].ai) {
+          else if(model.units[key].ai) {
             // console.log("hit ai", model.creeps.dog);s
-            ctx.drawImage(model.creeps.dog, outsideData.units[key].x - model.X + 500, outsideData.units[key].y - model.Y + 350, 136, 100);
+            ctx.drawImage(model.creeps.dog, model.units[key].x - model.X + 500, model.units[key].y - model.Y + 350, 136, 100);
           }
         }
       }
     }
 
     // draw the projectiles
-    if(outsideData.missles != null) {
-      var keys = Object.keys(outsideData.missles);
+    if(model.missles != null) {
+      var keys = Object.keys(model.missles);
       for(var j=0;j<keys.length;j++){
         key = keys[j];
-        let missle = outsideData.missles[key];
+        let missle = model.missles[key];
         ctx.beginPath();
         ctx.arc(missle.curX - model.X + 500, missle.curY - model.Y + 350, 5, 0, 2 * Math.PI, false);
         ctx.fillStyle = 'black';
@@ -825,9 +874,9 @@ function drawData() {
     }
 
     // draw health
-    if(outsideData.units != null) {
+    if(model.units != null) {
       ctx.fillStyle = '#a32';
-      ctx.fillRect(model.cX+24, model.cY-15,outsideData.units[model.id].health/2, 5);
+      ctx.fillRect(model.cX+24, model.cY-15,model.units[model.id].health/2, 5);
     }
 
     // Draw builds
@@ -844,10 +893,10 @@ function drawData() {
 };
 
 function hitUnit(x, y, unit) {
-  var xMin = outsideData.units[unit].x+50-(model.unitWidth/2);
-  var xMax = outsideData.units[unit].x+50+(model.unitWidth/2);
-  var yMin = outsideData.units[unit].y+50-(model.unitHeight/2);
-  var yMax = outsideData.units[unit].y+50+(model.unitHeight/2);
+  var xMin = model.units[unit].x+50-(model.unitWidth/2);
+  var xMax = model.units[unit].x+50+(model.unitWidth/2);
+  var yMin = model.units[unit].y+50-(model.unitHeight/2);
+  var yMax = model.units[unit].y+50+(model.unitHeight/2);
   if(x > xMin && x < xMax && y > yMin && y < yMax) {
     return true;
   }
@@ -915,7 +964,9 @@ const render = {
   },
   render: (outsideDataP) => {
     outsideData = outsideDataP;
-    renderActions();
+    ctx.clearRect(0, 0, model.vWidth, model.vHeight);
+    // renderActions();
+    // actions.performActions(1);
     drawMap();
   },
   renderIdle: renderIdle,
@@ -961,4 +1012,70 @@ var utils = {
 
 module.exports = utils;
 
-},{}]},{},[1]);
+},{}],7:[function(require,module,exports){
+const CONSTANTS = {
+  UNITWIDTH: 60,
+  UNITHEIGHT:100,
+  SPEED: 90,
+  SAVEINTERVAL: 900,
+  WINPERCENTAGE: .6,
+  RESETINTERVAL: 300,
+  MISSLESPEED: 30,
+  MISSLEDIST: 15
+}
+
+module.exports = CONSTANTS;
+
+},{}],8:[function(require,module,exports){
+const CONSTANTS = require('../shared/constants.js');
+
+function processMissles(missles, map, percentage) {
+  // console.log(percentage);
+  if(missles != null) {
+    var keys = Object.keys(missles);
+    for(let j=0;j<keys.length;j++) {
+      var key = keys[j];
+      if(missles[key].curX != null) {
+        var missle = missles[key];
+        missles[key].curX = missle.curX + (missle.dX * percentage);
+        missles[key].curY = missle.curY + (missle.dY * percentage);
+        missles[key].dist++;
+        if( missles[key].dist > CONSTANTS.MISSLEDIST || hitWall(missles[key].curX, missles[key].curY, map)) {
+          delete missles[key];
+        }
+      }
+    }
+  }
+  return missles;
+}
+
+function hitWall(iX, iY, map) {
+  if(map[parseInt(iX/100)] && map[parseInt(iX/100)][parseInt(iY/100)]) {
+    let tile = map[parseInt(iX/100)][parseInt(iY/100)];
+    if(tile.a == 2 || tile.a == 3) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// If all four corners are clear return true, else false
+function canGo(iX, iY, width, height, map) {
+  if(isClear(map[parseInt((iX+20)/100)][parseInt((iY+40)/100)])
+  && isClear(map[parseInt((iX+20)/100)][parseInt((iY+99)/100)])
+  && isClear(map[parseInt((iX+80)/100)][parseInt((iY+40)/100)])
+  && isClear(map[parseInt((iX+80)/100)][parseInt((iY+99)/100)])) {
+    return true;
+  }
+  return false;
+}
+
+function isClear(tile) {
+  if((tile.t == 0 || tile.t == 3 || tile.y == 7) && tile.a != 2)
+    return true;
+  return false;
+}
+
+module.exports = {processMissles: processMissles, canGo: canGo}
+
+},{"../shared/constants.js":7}]},{},[1]);

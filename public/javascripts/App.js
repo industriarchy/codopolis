@@ -15,6 +15,9 @@ var outsideData;
 var hits = {};
 var mapSet = false;
 var resetWait = 0;
+let previousTick = Date.now();
+let actualTicks = 0;
+const tickLengthMs = 1000 / 30;
 
 $( function() {
   c = document.getElementById("theView");
@@ -25,10 +28,36 @@ $( function() {
   model.creeps.dog = new Image();
   model.creeps.dog.src = '/static/images/dog.png';
   model.id = docCookies.getItem('userId');
+
   actions.assignListeners(c).then( () => {
     listenSocket();
+    socket.on('message', (msg) => {
+      console.log('mesage', msg);
+    })
+    gameLoop();
   });
 });
+
+const gameLoop = () => {
+  let now = Date.now();
+  if (previousTick + tickLengthMs <= now) {
+    let delta = (now - previousTick);
+    previousTick = now;
+    update(delta);
+    actualTicks = 0;
+  }
+  setTimeout(gameLoop, 0);
+};
+
+const update = (delta) => {
+  // Collect Data and render collected Data
+  actions.performActions(delta);
+  render.render(outsideData);
+  // Update Flags
+  // updateFlags(msg.flags);
+  // Detect Drain Flags
+  actions.detectFlag();
+}
 
 function listenSocket() {
   socket.on('appData', function(msg){
@@ -45,16 +74,16 @@ function listenSocket() {
       }
       else {
         // Emit your actions data
-        var data = { unit: {id: model.id, ll: model.flipped, up: actions.act.up, right: actions.act.right,
+        var data = { unit: {id: model.id, ll: model.flipped, up: actions.act.up, right: actions.act.right, newX: model.X, newY: model.Y,
            missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag}, mapSet: mapSet };
         socket.emit('appData', data);
 
         // Reset if dead
-        if(msg.units[model.id].alive == false || resetWait > 1) {
-          resetWait = 0;
-          resetLoc();
-        }
-        resetWait++;
+        // if(msg.units[model.id].alive == false || resetWait > 1) {
+        //   resetWait = 0;
+        //   resetLoc();
+        // }
+        // resetWait++;
 
         if(model.needsReset) {
           resetLoc();
@@ -72,13 +101,17 @@ function listenSocket() {
           // Collect Data and render collected Data
           clearData();
           outsideData = msg;
-          render.render(outsideData);
+          model.units = msg.units;
+          model.missles = msg.missles;
         }
-
-        // Update Flags
+        //
+        // // Update Flags
         updateFlags(msg.flags);
-        // Detect Drain Flags
-        actions.detectFlag();
+        // // Detect Drain Flags
+        // actions.detectFlag();
+        if(msg.units[model.id].resetLoc) {
+          model.needsReset = true;
+        }
       }
     }
   });

@@ -15,47 +15,6 @@ function renderIdle() {
   ctx.fillText("Idled out, please refresh page",350,300);
 };
 
-// This is for client-side rendering (for personal action to be smoother/quicker)
-function renderActions() {
-
-  ctx.clearRect(0, 0, model.vWidth, model.vHeight);
-
-  let beforeX = model.X;
-  if(actions.act.right != 0) {
-    if(canGo(model.X+actions.act.right, model.Y)) {
-      model.X+= actions.act.right;
-    }
-  }
-  if(actions.act.up != 0) {
-    if(canGo(beforeX, model.Y-actions.act.up)) {
-      model.Y-=actions.act.up;
-    }
-  }
-  if(actions.act.right < 0) {
-    model.flipped = true;
-  }
-  if(actions.act.right > 0) {
-    model.flipped = false;
-  }
-};
-
-// If all four corners are clear return true, else false
-function canGo(iX, iY) {
-  if(isClear(model.MAP[parseInt((iX+20)/100)][parseInt(iY/100)])
-  && isClear(model.MAP[parseInt((iX+20)/100)][parseInt((iY+99)/100)])
-  && isClear(model.MAP[parseInt((iX+80)/100)][parseInt((iY)/100)])
-  && isClear(model.MAP[parseInt((iX+80)/100)][parseInt((iY+99)/100)])) {
-    return true;
-  }
-  return false;
-};
-
-function isClear(tile) {
-  if((tile.t == 0 || tile.t == 3 || tile.y == 7) && tile.a != 2)
-    return true;
-  return false;
-};
-
 function drawMap() {
   let x0 = 500-model.X;
   let y0 = 350-model.Y;
@@ -186,7 +145,7 @@ function mouseInside(x1, x2, y1, y2) {
 
 function grassTile(x, y) {
   ctx.fillStyle = '#5a2';
-  ctx.fillRect(x,y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
   ctx.beginPath();
   ctx.moveTo(x+10, y+10);
   ctx.lineTo(x+20, y+30);
@@ -197,37 +156,37 @@ function grassTile(x, y) {
 
 function waterTile(x, y) {
   ctx.fillStyle = '#57a';
-  ctx.fillRect(x,y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
 };
 
 function waterTileb(x, y) {
   ctx.fillStyle = '#469';
-  ctx.fillRect(x,y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
 };
 
 function blankTile(x, y) {
   ctx.fillStyle = '#333';
-  ctx.fillRect(x,y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
 };
 
 function pathTile(x, y) {
   ctx.fillStyle = '#9a6';
-  ctx.fillRect(x,y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
 };
 
 function wallTile(x, y) {
   ctx.fillStyle = '#aaa';
-  ctx.fillRect(x, y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
 };
 
 function rampY(x, y) {
   ctx.fillStyle = '#5a2';
-  ctx.fillRect(x,y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
 };
 
 function rampX(x, y) {
   ctx.fillStyle = '#5a2';
-  ctx.fillRect(x,y,100, 100);
+  ctx.fillRect(x-1,y-1,101, 101);
 };
 
 function smallTree(x, y) {
@@ -278,27 +237,27 @@ function drawData() {
   if(outsideData != null) {
 
     // Draw the Players
-    if(outsideData.units != null) {
-      var keys = Object.keys(outsideData.units);
+    if(model.units != null) {
+      var keys = Object.keys(model.units);
       for(var i=0;i<keys.length;i++){
         var key= keys[i];
 
         // check if unit is logged in
-        if(outsideData.units[key]) {
-          if(outsideData.units[key].loggedIn) {
+        if(model.units[key]) {
+          if(model.units[key].loggedIn) {
             if(key != model.id) {
-              if(outsideData.units[key].ll) {
-                ctx.drawImage(model.fDude, outsideData.units[key].x - model.X + 500, outsideData.units[key].y - model.Y + 350, 100, 100);
+              if(model.units[key].ll) {
+                ctx.drawImage(model.fDude, model.units[key].x - model.X + 500, model.units[key].y - model.Y + 350, 100, 100);
               }
               else {
-                ctx.drawImage(model.dude, outsideData.units[key].x - model.X + 500, outsideData.units[key].y - model.Y + 350, 100, 100);
+                ctx.drawImage(model.dude, model.units[key].x - model.X + 500, model.units[key].y - model.Y + 350, 100, 100);
               }
               ctx.fillStyle = '#a32';
-              ctx.fillRect(outsideData.units[key].x+24 - model.X + 500,outsideData.units[key].y-15 - model.Y + 350,outsideData.units[key].health/2, 5);
+              ctx.fillRect(model.units[key].x+24 - model.X + 500,model.units[key].y-15 - model.Y + 350,model.units[key].health/2, 5);
             }
 
             //Check for hit
-            var myMissles = outsideData.missles;
+            var myMissles = model.missles;
             hits = {};
             if(myMissles != null && key != model.id) {
               var keys2 = Object.keys(myMissles);
@@ -315,20 +274,20 @@ function drawData() {
               }
             }
           }
-          else if(outsideData.units[key].ai) {
+          else if(model.units[key].ai) {
             // console.log("hit ai", model.creeps.dog);s
-            ctx.drawImage(model.creeps.dog, outsideData.units[key].x - model.X + 500, outsideData.units[key].y - model.Y + 350, 136, 100);
+            ctx.drawImage(model.creeps.dog, model.units[key].x - model.X + 500, model.units[key].y - model.Y + 350, 136, 100);
           }
         }
       }
     }
 
     // draw the projectiles
-    if(outsideData.missles != null) {
-      var keys = Object.keys(outsideData.missles);
+    if(model.missles != null) {
+      var keys = Object.keys(model.missles);
       for(var j=0;j<keys.length;j++){
         key = keys[j];
-        let missle = outsideData.missles[key];
+        let missle = model.missles[key];
         ctx.beginPath();
         ctx.arc(missle.curX - model.X + 500, missle.curY - model.Y + 350, 5, 0, 2 * Math.PI, false);
         ctx.fillStyle = 'black';
@@ -338,9 +297,9 @@ function drawData() {
     }
 
     // draw health
-    if(outsideData.units != null) {
+    if(model.units != null) {
       ctx.fillStyle = '#a32';
-      ctx.fillRect(model.cX+24, model.cY-15,outsideData.units[model.id].health/2, 5);
+      ctx.fillRect(model.cX+24, model.cY-15,model.units[model.id].health/2, 5);
     }
 
     // Draw builds
@@ -357,10 +316,10 @@ function drawData() {
 };
 
 function hitUnit(x, y, unit) {
-  var xMin = outsideData.units[unit].x+50-(model.unitWidth/2);
-  var xMax = outsideData.units[unit].x+50+(model.unitWidth/2);
-  var yMin = outsideData.units[unit].y+50-(model.unitHeight/2);
-  var yMax = outsideData.units[unit].y+50+(model.unitHeight/2);
+  var xMin = model.units[unit].x+50-(model.unitWidth/2);
+  var xMax = model.units[unit].x+50+(model.unitWidth/2);
+  var yMin = model.units[unit].y+50-(model.unitHeight/2);
+  var yMax = model.units[unit].y+50+(model.unitHeight/2);
   if(x > xMin && x < xMax && y > yMin && y < yMax) {
     return true;
   }
@@ -428,7 +387,9 @@ const render = {
   },
   render: (outsideDataP) => {
     outsideData = outsideDataP;
-    renderActions();
+    ctx.clearRect(0, 0, model.vWidth, model.vHeight);
+    // renderActions();
+    // actions.performActions(1);
     drawMap();
   },
   renderIdle: renderIdle,

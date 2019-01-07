@@ -3,11 +3,13 @@
 const map = require('./map.js');
 const utils = require('./utility.js');
 const formats = require('./formats.js')
+const functions = require('../shared/functions.js');
 const drainRange = 100;
 let flagDrains = [];
 var unitWidth = 60;
 var unitHeight = 100;
 const damage = 30;
+const distTolerance = 50;
 
 function processData() {
   processUnits();
@@ -55,12 +57,28 @@ function processUnits() {
 
           // Process movement
           let beforeX = theUnit.x;
+          let beforeY = theUnit.y;
           if(theUnit.x && theUnit.y) {
-            if(theUnit.right && canGo(theUnit.x + theUnit.right, theUnit.y)) {
-              theUnit.x += theUnit.right;
+            if(theUnit.right && inRange(theUnit.x, theUnit.y, theUnit.newX, theUnit.newY, distTolerance)) {
+              // if (canGo(theUnit.x + theUnit.right, theUnit.y)) {
+                theUnit.x = theUnit.newX;
+                theUnit.resetLoc = false;
+              // }
+              // else {
+              //
+              // }
             }
-            if(theUnit.up && canGo(beforeX, theUnit.y - theUnit.up)) {
-              theUnit.y -= theUnit.up;
+            else if(theUnit.right != 0) {
+              theUnit.resetLoc = true;
+            }
+            if(theUnit.up && inRange(theUnit.x, theUnit.y, theUnit.newX, theUnit.newY, distTolerance)) {
+              // if (canGo(beforeX, theUnit.y - theUnit.up)) {
+                theUnit.y = theUnit.newY;
+                map.mapData.units[key].resetLoc = false;
+              // }
+            }
+            else if(theUnit.up != 0) {
+              theUnit.resetLoc = true;
             }
           }
 
@@ -96,21 +114,7 @@ function valid(unit) {
 }
 
 function processMissles() {
-  if(map.mapData.missles != null) {
-    var keys = Object.keys(map.mapData.missles);
-    for(let j=0;j<keys.length;j++) {
-      var key = keys[j];
-      if(map.mapData.missles[key].curX != null) {
-        var missle = map.mapData.missles[key];
-        map.mapData.missles[key].curX = missle.curX + missle.dX;
-        map.mapData.missles[key].curY = missle.curY + missle.dY;
-        map.mapData.missles[key].dist++;
-        if( map.mapData.missles[key].dist > 30 || hitWall(map.mapData.missles[key].curX, map.mapData.missles[key].curY)) {
-          delete map.mapData.missles[key];
-        }
-      }
-    }
-  }
+  map.mapData.missles = functions.processMissles(map.mapData.missles, map.map, 1);
 }
 
 function processFlags() {
@@ -143,10 +147,11 @@ function hitUnit(x, y, unit) {
 
 function hitWall(iX, iY) {
   let tile = map.map[parseInt(iX/100)][parseInt(iY/100)];
-  if(tile.t == 0 || tile.t == 1 || tile.t == 2 || tile.t == 3 || tile.y == 7) {
-    return false;
+  // if(tile.t == 0 || tile.t == 1 || tile.t == 2 || tile.t == 3 || tile.y == 7) {
+  if(tile.a == 2 || tile.a == 3) {
+    return true;
   }
-  return true;
+  return false;
 }
 
 function die(unit) {

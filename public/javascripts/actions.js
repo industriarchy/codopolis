@@ -5,12 +5,17 @@
 var utils = require('./utility');
 var model = require('./model');
 var docCookies = require('./cookies');
+const functions = require('../../shared/functions.js');
+const CONSTANTS = require('../../shared/constants.js');
 
 var mouse;
 var sX, sY, eX, eY;
+var socket = io();
 
 function goUp() {
   actions.act.up = model.s;
+  console.log("sending message");
+  socket.emit('message', "a message!");
 };
 
 function goDown() {
@@ -59,8 +64,8 @@ function shoot(x2, y2) {
   let aMissle = {
    curX: model.X+50,
    curY: model.Y+50,
-   dX: diff.x * 15,
-   dY: diff.y * 15,
+   dX: diff.x * CONSTANTS.MISSLESPEED,
+   dY: diff.y * CONSTANTS.MISSLESPEED,
    dist: 0,
    type: "A",
    shooting: true
@@ -158,6 +163,54 @@ function detectFlag() {
   });
 }
 
+function performActions(delta) {
+  let percentage = delta / model.p;
+  let beforeX = model.X;
+  let dX = actions.act.right * percentage;
+  let dY = actions.act.up * percentage;
+  if(actions.act.right != 0) {
+    if(functions.canGo(model.X + dX, model.Y, 20, 80, model.MAP)) {
+      model.X += dX;
+    }
+  }
+  if(actions.act.up != 0) {
+    if(functions.canGo(beforeX, model.Y - dY, 20, 80, model.MAP)) {
+      model.Y -= dY
+    }
+  }
+  if(actions.act.right < 0) {
+    model.flipped = true;
+  }
+  if(actions.act.right > 0) {
+    model.flipped = false;
+  }
+  // Move  missles
+  processMissles(percentage);
+
+};
+
+
+function processMissles(percentage) {
+  model.missles = functions.processMissles(model.missles, model.MAP, percentage);
+}
+
+// If all four corners are clear return true, else false
+// function canGo(iX, iY) {
+//   if(isClear(model.MAP[parseInt((iX+20)/100)][parseInt(iY/100)])
+//   && isClear(model.MAP[parseInt((iX+20)/100)][parseInt((iY+99)/100)])
+//   && isClear(model.MAP[parseInt((iX+80)/100)][parseInt((iY)/100)])
+//   && isClear(model.MAP[parseInt((iX+80)/100)][parseInt((iY+99)/100)])) {
+//     return true;
+//   }
+//   return false;
+// };
+//
+// function isClear(tile) {
+//   if((tile.t == 0 || tile.t == 3 || tile.y == 7) && tile.a != 2)
+//     return true;
+//   return false;
+// };
+
 // Export functions
 var actions = {
 
@@ -214,6 +267,7 @@ var actions = {
       resolve(a);
     });
   },
+  performActions: performActions,
   act: {                           // actions
     up: 0,
     right: 0,
