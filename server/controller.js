@@ -56,28 +56,18 @@ function processUnits() {
           }
 
           // Process movement
-          let beforeX = theUnit.x;
-          let beforeY = theUnit.y;
-          if(theUnit.x && theUnit.y) {
-            if(theUnit.right && inRange(theUnit.x, theUnit.y, theUnit.newX, theUnit.newY, distTolerance)) {
-              // if (canGo(theUnit.x + theUnit.right, theUnit.y)) {
+          if (theUnit.x && theUnit.y && theUnit.newX && theUnit.newY) {
+            if (functions.canGo(theUnit.newX, theUnit.newY, 60, 60, map.map) && inRange(theUnit.x, theUnit.y, theUnit.newX, theUnit.newY, distTolerance)) {
+              if (theUnit.right) {
                 theUnit.x = theUnit.newX;
                 theUnit.resetLoc = false;
-              // }
-              // else {
-              //
-              // }
-            }
-            else if(theUnit.right != 0) {
-              theUnit.resetLoc = true;
-            }
-            if(theUnit.up && inRange(theUnit.x, theUnit.y, theUnit.newX, theUnit.newY, distTolerance)) {
-              // if (canGo(beforeX, theUnit.y - theUnit.up)) {
+              }
+              if (theUnit.up) {
                 theUnit.y = theUnit.newY;
                 map.mapData.units[key].resetLoc = false;
-              // }
+              }
             }
-            else if(theUnit.up != 0) {
+            else {
               theUnit.resetLoc = true;
             }
           }
@@ -141,15 +131,6 @@ function hitUnit(x, y, unit) {
     if(x > xMin && x < xMax && y > yMin && y < yMax) {
       return true;
     }
-  }
-  return false;
-}
-
-function hitWall(iX, iY) {
-  let tile = map.map[parseInt(iX/100)][parseInt(iY/100)];
-  // if(tile.t == 0 || tile.t == 1 || tile.t == 2 || tile.t == 3 || tile.y == 7) {
-  if(tile.a == 2 || tile.a == 3) {
-    return true;
   }
   return false;
 }
