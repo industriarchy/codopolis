@@ -2,19 +2,17 @@
 
 const map = require('./map.js');
 const utils = require('./utility.js');
-const formats = require('./formats.js')
+const formats = require('../shared/formats.js')
 const functions = require('../shared/functions.js');
+const SharedConst = require('../shared/constants.js');
 const drainRange = 100;
 let flagDrains = [];
-var unitWidth = 60;
-var unitHeight = 100;
-const damage = 30;
-const distTolerance = 50;
 
 function processData() {
   processUnits();
   processMissles();
   processFlags();
+  processBuilds();
 }
 
 function processUnits() {
@@ -26,6 +24,7 @@ function processUnits() {
       var key = keys[i];
 
       if(!utils.validate(formats.unit, map.mapData.units[key])) {
+        console.log("deleting unit", map.mapData.units[key]);
         delete map.mapData.units[key];
       }
 
@@ -46,7 +45,7 @@ function processUnits() {
               if(missle.sender != key) {
                 if(hitUnit(missle.curX, missle.curY, theUnit)) {
                   delete map.mapData.missles[key2];
-                  theUnit.health -= damage;
+                  theUnit.health -= SharedConst.DAMAGE;
                   if(theUnit.health < 0) {
                     die(key);
                   }
@@ -57,17 +56,13 @@ function processUnits() {
 
           // Process movement
           if (theUnit.x && theUnit.y && theUnit.newX && theUnit.newY) {
-            if (functions.canGo(theUnit.newX, theUnit.newY, 60, 60, map.map) && inRange(theUnit.x, theUnit.y, theUnit.newX, theUnit.newY, distTolerance)) {
-              if (theUnit.right) {
+            if (functions.canGo(theUnit.newX, theUnit.newY, 60, 60, map.map) && inRange(theUnit.x, theUnit.y, theUnit.newX, theUnit.newY, SharedConst.MAXSPEED)) {
                 theUnit.x = theUnit.newX;
-                theUnit.resetLoc = false;
-              }
-              if (theUnit.up) {
                 theUnit.y = theUnit.newY;
-                map.mapData.units[key].resetLoc = false;
-              }
+                theUnit.resetLoc = false;
             }
             else {
+              console.log("sending reset");
               theUnit.resetLoc = true;
             }
           }
@@ -114,20 +109,30 @@ function processFlags() {
       if(flag.flag.health > 100) {
         return;
       } else {
-        map.mapData.flags[flag.id] = flag.flag;
-        map.map[flag.flag.x][flag.flag.y].h = flag.flag.health;
+        if(flag.flag.health < map.map[flag.flag.x][flag.flag.y].h) {
+          map.map[flag.flag.x][flag.flag.y].h--;
+        }
+        else {
+          map.map[flag.flag.x][flag.flag.y].h++;
+        }
+        map.mapData.flags[flag.id].owner = flag.flag.owner;
+        map.mapData.flags[flag.id].health = map.map[flag.flag.x][flag.flag.y].h;
         map.map[flag.flag.x][flag.flag.y].o = flag.flag.owner;
       }
     }
   });
 }
 
+function processBuilds() {
+
+}
+
 function hitUnit(x, y, unit) {
   if(unit.x != null) {
-    var xMin = unit.x+50-(unitWidth/2);
-    var xMax = unit.x+50+(unitWidth/2);
-    var yMin = unit.y+50-(unitHeight/2);
-    var yMax = unit.y+50+(unitHeight/2);
+    var xMin = unit.x+50-(SharedConst.UNITWIDTH/2);
+    var xMax = unit.x+50+(SharedConst.UNITWIDTH/2);
+    var yMin = unit.y+50-(SharedConst.UNITHEIGHT/2);
+    var yMax = unit.y+50+(SharedConst.UNITHEIGHT/2);
     if(x > xMin && x < xMax && y > yMin && y < yMax) {
       return true;
     }
@@ -140,8 +145,6 @@ function die(unit) {
     x: map.neutralSpawn.x,
     y: map.neutralSpawn.y,
     ll: true,
-    right: 0,
-    up: 0,
     health: 100,
     timeout: 0,
     alive: false,
@@ -177,38 +180,42 @@ function isClear(tile) {
 
 function shoot(msg) {
   // first check timeout
-  if(map.mapData.units[msg.unit.id].timeout < 1) {
+  if(map.mapData.units[msg.unit.id]) {
+    if(map.mapData.units[msg.unit.id].timeout < 1) {
 
-    // Then look through missles
-    var keys = Object.keys(msg.unit.missles);
-    for(var i=0;i<keys.length;i++){
-      var key = keys[i];
-      // if theres a new missle
-      if(msg.unit.missles[key].shooting) {
-        // add the new missle to the json
-        map.mapData.curMId++;
-        let aMissle = {
-          sender: msg.unit.id,
-          curX: map.mapData.units[msg.unit.id].x + 50,
-          curY: map.mapData.units[msg.unit.id].y + 50,
-          dX: msg.unit.missles[key].dX,
-          dY: msg.unit.missles[key].dY,
-          dist: 0,
-          type: msg.unit.missles[key].type
-        };
-        map.mapData.missles[map.mapData.curMId] = aMissle;
-        map.mapData.units[msg.unit.id].timeout = 30;
+      // Then look through missles
+      var keys = Object.keys(msg.unit.missles);
+      for(var i=0;i<keys.length;i++){
+        var key = keys[i];
+        // if theres a new missle
+        if(msg.unit.missles[key].shooting) {
+          // add the new missle to the json
+          map.mapData.curMId++;
+          let aMissle = {
+            sender: msg.unit.id,
+            curX: map.mapData.units[msg.unit.id].x + 50,
+            curY: map.mapData.units[msg.unit.id].y + 50,
+            dX: msg.unit.missles[key].dX,
+            dY: msg.unit.missles[key].dY,
+            dist: 0,
+            type: msg.unit.missles[key].type
+          };
+          map.mapData.missles[map.mapData.curMId] = aMissle;
+          map.mapData.units[msg.unit.id].timeout = 30;
+        }
       }
     }
-  }
-  else {
-    map.mapData.units[msg.unit.id].timeout--;
+    else {
+      map.mapData.units[msg.unit.id].timeout--;
+    }
   }
 }
 
 function build(msg) {
-  map.change(msg.unit.build.type, msg.unit.build.x, msg.unit.build.y);
-  map.mapData.builds = {type: msg.unit.build.type, x: msg.unit.build.x, y: msg.unit.build.y};
+  if(utils.validate(msg.unit.build)) {
+    map.change(msg.unit.build.type, msg.unit.build.x, msg.unit.build.y);
+    map.mapData.builds = {type: msg.unit.build.type, x: msg.unit.build.x, y: msg.unit.build.y};
+  }
 }
 
 function clearActions() {

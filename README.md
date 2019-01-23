@@ -100,3 +100,5 @@ TODO:
 * Creeps need to be added
 * Map needs to be made
 * Save on logouts and every 30 seconds?
+
+Server is at 138.197.17.220

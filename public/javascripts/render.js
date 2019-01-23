@@ -5,6 +5,7 @@
 const model = require('./model');
 const utils = require('./utility');
 const actions = require('./actions');
+const SharedConst = require('../../shared/constants.js');
 let ctx;
 let outsideData;
 
@@ -85,7 +86,6 @@ function drawMap() {
   if(actions.placingF) {
     highLightPotential();
   }
-  drawData();
 };
 
 function highLightPotential() {
@@ -297,7 +297,7 @@ function drawData() {
     }
 
     // draw health
-    if(model.units != null) {
+    if(model.units[model.id] != null) {
       ctx.fillStyle = '#a32';
       ctx.fillRect(model.cX+24, model.cY-15,model.units[model.id].health/2, 5);
     }
@@ -378,7 +378,7 @@ function gameWon(win) {
   ctx.fillStyle = 'white';
   ctx.font = "30px Arial";
   ctx.fillText("Game Won by: " + win.user,350,300);
-  ctx.fillText("Reset in: " + parseInt(win.reset/33 + 1), 350, 400);
+  ctx.fillText("Reset in: " + parseInt(win.reset/(1000 / SharedConst.SPEED) + 1), 350, 400);
 };
 
 const render = {
@@ -388,9 +388,8 @@ const render = {
   render: (outsideDataP) => {
     outsideData = outsideDataP;
     ctx.clearRect(0, 0, model.vWidth, model.vHeight);
-    // renderActions();
-    // actions.performActions(1);
     drawMap();
+    drawData();
   },
   renderIdle: renderIdle,
   gameWon: gameWon

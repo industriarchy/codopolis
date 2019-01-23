@@ -72,6 +72,9 @@ app.use('/static', express.static(__dirname + '/public'));
 // map.readDBMap(db, 'game');
 map.readMap("game");
 
+// load characters
+loadChars();
+
 // Setup Routing for main page
 app.get('/', function(req, res){
   if(!req.session.user) {
@@ -81,49 +84,17 @@ app.get('/', function(req, res){
   else {
     res.cookie('userId', req.session.user);
     res.cookie('MAP', map.map);
-    if(!charsLoaded)
-      loadChars().then( () => {
-        loadAI().then( () => {
-          if(newChar(req.session.user)) {
-            users.makeChar(req.session.user);
-          };
-        });
+    if (!charLoaded(req.session.user)) {
+      console.log("loading character");
+      users.loadChar(req.session.user, db).then( () => {
+        res.sendFile(__dirname + '/index.html');
       });
-    else {
-      if(newChar(req.session.user)) {
-        users.makeChar(req.session.user);
-      };
     }
-    res.sendFile(__dirname + '/index.html');
+    else {
+      res.sendFile(__dirname + '/index.html');
+    }
   }
 });
-
-//  ------------------ map.mapData Format  ----------------------
-//  curId: int          -> specifies the next id to be created by new player
-//  units: {
-//   id: {              -> id of the units
-//      x: int          -> x-coord of unit
-//      y: int          -> y-coord of unit
-//      ll: bool        -> var for looking right
-//      timeout: int    -> time left before another shot
-//      health: int     -> amount of health left
-//      loggedIn: bool  -> determines if logged in or not
-//      }
-//    },
-//  },
-//  curMId: int
-//  missles: {
-//    id: { int         -> id of missle
-//      sender: int     -> id of the sender
-//      curX: int       -> current x-coord
-//      curY: int       -> current y-coord
-//      dX: int         -> travel CONSTANTS.SPEED x
-//      dY: int         -> travel CONSTANTS.SPEED y
-//      dist: int       -> distance traveled so far
-//      type: string    -> projectile type
-//    },
-//  map: map
-//  ----------------------------------------------------------
 
 io.on('connection', function(socket){
   let newClient = {socket: socket.id};
@@ -133,6 +104,7 @@ io.on('connection', function(socket){
   })
 
   socket.on('appData', function(msg){
+    // console.log(msg);
     // Set idle timeout
     if(sAddresses[socket.id]) {
       sAddresses[socket.id].idle = 0;
@@ -152,23 +124,17 @@ io.on('connection', function(socket){
         map.mapData.units[msg.unit.id].alive = true;
       }
       else {
-        console.log("unit nulled", msg.unit);
+        // console.log("unit nulled", msg.unit);
       }
     }
 
-    // add unit to map data if not there
-    if(map.mapData.units[msg.unit.id] == null) {
-      map.mapData.units[msg.unit.id] = msg.unit;
-      map.mapData.units[msg.unit.id].missles.timeout = 0;
+    if(msg.unit && map.mapData.units[msg.unit.id]) {
+      map.mapData.units[msg.unit.id].newX = msg.unit.newX;
+      map.mapData.units[msg.unit.id].newY = msg.unit.newY;
+      map.mapData.units[msg.unit.id].ll = msg.unit.ll;
+      map.mapData.units[msg.unit.id].loggedIn = true;
+      map.mapData.units[msg.unit.id].drainFlag = msg.unit.drainFlag;
     }
-
-    map.mapData.units[msg.unit.id].up = msg.unit.up;
-    map.mapData.units[msg.unit.id].right = msg.unit.right;
-    map.mapData.units[msg.unit.id].newX = msg.unit.newX;
-    map.mapData.units[msg.unit.id].newY = msg.unit.newY;
-    map.mapData.units[msg.unit.id].ll = msg.unit.ll;
-    map.mapData.units[msg.unit.id].loggedIn = true;
-    map.mapData.units[msg.unit.id].drainFlag = msg.unit.drainFlag;
 
     // Add a missle if there
     if(msg.unit.missles == undefined) {
@@ -227,7 +193,6 @@ function batchSend(socket) {
   pushIfNew(socket.id);
   if(!alreadySending) {
     setInterval(() => {
-      // console.log(map.mapData);
       if(numConnected > 0) {
         count++;
         if(count >= CONSTANTS.SAVEINTERVAL) {
@@ -258,11 +223,6 @@ function batchSend(socket) {
           }
           else {
             sAddresses[key].idle++;
-            // if(map.mapData.units && map.mapData.units[sAddresses[key].unit]) {
-            //   if(map.mapData.units[sAddresses[key].unit].idle)
-            //     map.mapData.units[sAddresses[key].unit].idle++;
-            //   else map.mapData.units[sAddresses[key].unit].idle = 0;
-            // }
             sAddresses[key].data.units = map.mapData.units;
             sAddresses[key].data.missles = map.mapData.missles;
             sAddresses[key].data.builds = map.mapData.builds;
@@ -289,8 +249,8 @@ function pushIfNew(socket) {
     sAddresses[socket] = {data: {map: map.map, setMap: true}, idle: 0};
 }
 
-function newChar(id) {
-  if(map.mapData.units[id] != null) {
+function charLoaded(id) {
+  if(map.mapData.units[id] == null) {
     return false;
   }
   return true;

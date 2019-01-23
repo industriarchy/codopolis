@@ -3,7 +3,9 @@ var router = express.Router();
 const aiProfiles = require('../server/aiProfiles');
 const ai = require('../server/ai');
 var map = require('../server/map.js');
-
+var uuidv1 = require('uuid/v1');
+var formats = require('../shared/formats');
+const utils = require('../server/utility');
 
 router.post('/login/:email/:password', function(req, res) {
   var db = req.db;
@@ -35,32 +37,36 @@ router.post('/logout', function(req, res) {
  */
 router.post('/adduser', function(req, res) {
   console.log("hit adduser");
-  var db = req.db;
+  let db = req.db;
   console.log(req.body);
-  var collection = db.get('userlist');
-  var newChar = {
-    x: 500,
-    y: 350,
-    ll: true,
-    right: 0,
-    up: 0,
-    health: 100,
-    timeout: 0,
-    alive: false,
-    loggedIn: true
+  let collection = db.get('userlist');
+  if( utils.validate(formats.newUser, req.body) ) {
+    checkUser(req.body.username, collection).then( (result) => {
+      if (result) {
+        let newUser = {};
+        newUser.username = req.body.username;
+        newUser.email = req.body.email;
+        newUser.password = req.body.password;
+        newUser.char = Object.assign({}, formats.unit);
+        console.log("new user", newUser);
+        collection.insert(newUser, function(err, result){
+            req.session.user = req.body.username;
+            res.send(
+                (err === null) ? { msg: '' } : { msg: err }
+            );
+        });
+        const newAi = Object.assign({}, formats.aiProfiles.pet);
+        newAi.owner = req.body.username;
+        ai.new(newAi, db);
+      }
+      else {
+        res.send( { msg: 'already exists' } );
+      }
+    });
   }
-  newUser = req.body;
-  newUser.char = newChar;
-  collection.insert(newUser, function(err, result){
-      req.session.user = req.body.username;
-      res.send(
-          (err === null) ? { msg: '' } : { msg: err }
-      );
-  });
-  ai.new(aiProfiles.pet, db);
-
-  // add character to mapData
-  makeChar(req.body.username);
+  else {
+    res.send( { msg: 'body invalid' } );
+  }
 })
 
 /*
@@ -150,21 +156,28 @@ router.post('/demo', function(req, res) {
     });
 });
 
-function makeChar(id) {
-  map.mapData.units[id] = {
-    x: map.neutralSpawn.x || 0,
-    y: map.neutralSpawn.y || 0,
-    ll: true,
-    right: 0,
-    up: 0,
-    health: 100,
-    timeout: 0,
-    alive: false
-  }
-  makeAI(id + 'ai', id);
+function loadChar(id, db) {
+  return new Promise( function(resolve, reject) {
+    // map.mapData.units[id] = Object.assign({}, formats.unit);
+    // resolve(false);
+    const collection = db.get('userlist');
+    collection.findOne({ 'username' : id }, {}, function(e,docs){
+      if(e === null) {
+        if(docs != null) {
+          console.log("unit found", docs);
+          map.mapData.units[id] = docs.char;
+          resolve(true);
+        }
+        else {
+          map.mapData.units[id] = Object.assign({}, formats.unit);
+          resolve(false);
+        }
+      }
+    });
+  });
 }
 
-function makeAI(id, userid) {
+function loadAI(id, userid) {
   console.log("made ai");
   map.mapData.units[id] = {
     owner: userid,
@@ -180,4 +193,17 @@ function makeAI(id, userid) {
   }
 }
 
-module.exports = { router: router, makeChar: makeChar };
+checkUser = (user, collection) => {
+  return new Promise( function(resolve) {
+    collection.find({ 'username' : user }, {}, function(e,docs){
+      if(e === null) {
+        if(docs[0] != null) {
+          resolve(false);
+        }
+        else {resolve(true);}
+      }
+    });
+  });
+};
+
+module.exports = { router: router, loadChar: loadChar };

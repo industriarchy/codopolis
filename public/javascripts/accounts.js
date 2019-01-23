@@ -62,22 +62,16 @@ function addUser(event) {
                 url: '/users/adduser',
                 dataType: 'JSON'
             }).done(function( response ) {
-
                 // Check for successful (blank) response
                 if (response.msg === '') {
-
                     // Clear the form inputs
                     $('#addUser fieldset input').val('');
-
                     // Update page
                     location.reload();
-
                 }
                 else {
-
                     // If something goes wrong, alert the error message that our service returned
                     alert('Error: ' + response.msg);
-
                 }
             });
           }

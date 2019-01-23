@@ -13,12 +13,11 @@ var c;
 var ctx;
 var socket = io();
 var outsideData;
-var hits = {};
 var mapSet = false;
-var resetWait = 0;
 let previousTick = Date.now();
 let actualTicks = 0;
 const tickLengthMs = 1000 / 30;
+let gameWon = {won: false};
 
 $( function() {
   c = document.getElementById("theView");
@@ -29,6 +28,7 @@ $( function() {
   model.creeps.dog = new Image();
   model.creeps.dog.src = '/static/images/dog.png';
   model.id = docCookies.getItem('userId');
+  initiateSocket();
 
   actions.assignListeners(c).then( () => {
     listenSocket();
@@ -51,13 +51,22 @@ const gameLoop = () => {
 };
 
 const update = (delta) => {
-  // Collect Data and render collected Data
-  actions.performActions(delta);
-  render.render(outsideData);
-  // Update Flags
-  // updateFlags(msg.flags);
-  // Detect Drain Flags
-  actions.detectFlag();
+  if (gameWon.won) {
+    render.gameWon(gameWon);
+  }
+  else {
+    // Collect Data and render collected Data
+    actions.performActions(delta);
+    render.render(outsideData);
+    // Detect Drain Flags
+    actions.detectFlag();
+  }
+}
+
+function initiateSocket() {
+  var data = { unit: {id: model.id, ll: model.flipped, newX: model.X, newY: model.Y,
+     missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag}, mapSet: mapSet };
+  socket.emit('appData', data);
 }
 
 function listenSocket() {
@@ -71,20 +80,15 @@ function listenSocket() {
 
       // determine if game is won
       if (msg.win && msg.win.won) {
-        render.gameWon(msg.win);
+        gameWon = msg.win;
+        // render.gameWon(msg.win);
       }
       else {
+        gameWon.won = false;
         // Emit your actions data
-        var data = { unit: {id: model.id, ll: model.flipped, up: actions.act.up, right: actions.act.right, newX: model.X, newY: model.Y,
+        var data = { unit: {id: model.id, ll: model.flipped, newX: model.X, newY: model.Y,
            missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag}, mapSet: mapSet };
         socket.emit('appData', data);
-
-        // Reset if dead
-        // if(msg.units[model.id].alive == false || resetWait > 1) {
-        //   resetWait = 0;
-        //   resetLoc();
-        // }
-        // resetWait++;
 
         if(model.needsReset) {
           resetLoc();
@@ -102,17 +106,18 @@ function listenSocket() {
           // Collect Data and render collected Data
           clearData();
           outsideData = msg;
+
+          // update the units and missles in the model
           model.units = msg.units;
           model.missles = msg.missles;
+
+          if(msg.units[model.id] && msg.units[model.id].resetLoc) {
+            model.needsReset = true;
+          }
         }
-        //
-        // // Update Flags
+
+        // Update Flags
         updateFlags(msg.flags);
-        // // Detect Drain Flags
-        // actions.detectFlag();
-        if(msg.units[model.id].resetLoc) {
-          model.needsReset = true;
-        }
       }
     }
   });
@@ -139,6 +144,7 @@ function resetLoc() {
     if(outsideData.units[model.id] != null) {
       model.X = outsideData.units[model.id].x;
       model.Y = outsideData.units[model.id].y;
+      console.log("reset location");
       model.needsReset = false;
     }
   }
@@ -167,8 +173,7 @@ var socket = io();
 
 function goUp() {
   actions.act.up = model.s;
-  console.log("sending message");
-  socket.emit('message', "a message!");
+  console.log("going up");
 };
 
 function goDown() {
@@ -582,6 +587,7 @@ module.exports = model;
 const model = require('./model');
 const utils = require('./utility');
 const actions = require('./actions');
+const SharedConst = require('../../shared/constants.js');
 let ctx;
 let outsideData;
 
@@ -662,7 +668,6 @@ function drawMap() {
   if(actions.placingF) {
     highLightPotential();
   }
-  drawData();
 };
 
 function highLightPotential() {
@@ -874,7 +879,7 @@ function drawData() {
     }
 
     // draw health
-    if(model.units != null) {
+    if(model.units[model.id] != null) {
       ctx.fillStyle = '#a32';
       ctx.fillRect(model.cX+24, model.cY-15,model.units[model.id].health/2, 5);
     }
@@ -955,7 +960,7 @@ function gameWon(win) {
   ctx.fillStyle = 'white';
   ctx.font = "30px Arial";
   ctx.fillText("Game Won by: " + win.user,350,300);
-  ctx.fillText("Reset in: " + parseInt(win.reset/33 + 1), 350, 400);
+  ctx.fillText("Reset in: " + parseInt(win.reset/(1000 / SharedConst.SPEED) + 1), 350, 400);
 };
 
 const render = {
@@ -965,9 +970,8 @@ const render = {
   render: (outsideDataP) => {
     outsideData = outsideDataP;
     ctx.clearRect(0, 0, model.vWidth, model.vHeight);
-    // renderActions();
-    // actions.performActions(1);
     drawMap();
+    drawData();
   },
   renderIdle: renderIdle,
   gameWon: gameWon
@@ -975,7 +979,7 @@ const render = {
 
 module.exports = render;
 
-},{"./actions":2,"./model":4,"./utility":6}],6:[function(require,module,exports){
+},{"../../shared/constants.js":7,"./actions":2,"./model":4,"./utility":6}],6:[function(require,module,exports){
 // -----------------------------------------------------------------------------
 // ============================== UTILITY ========================================
 // -----------------------------------------------------------------------------
@@ -1013,21 +1017,24 @@ var utils = {
 module.exports = utils;
 
 },{}],7:[function(require,module,exports){
-const CONSTANTS = {
+const SharedConst = {
   UNITWIDTH: 60,
   UNITHEIGHT:100,
-  SPEED: 90,
+  SPEED: 45,
   SAVEINTERVAL: 900,
   WINPERCENTAGE: .6,
-  RESETINTERVAL: 300,
-  MISSLESPEED: 30,
-  MISSLEDIST: 15
+  RESETINTERVAL: 222,
+  MISSLESPEED: 15,
+  MISSLEDIST: 30,
+  MAXSPEED: 30,
+  DRAINRANGE: 100,
+  DAMAGE: 30
 }
 
-module.exports = CONSTANTS;
+module.exports = SharedConst;
 
 },{}],8:[function(require,module,exports){
-const CONSTANTS = require('../shared/constants.js');
+const CONSTANTS = require('./constants.js');
 
 function processMissles(missles, map, percentage) {
   // console.log(percentage);
@@ -1078,4 +1085,4 @@ function isClear(tile) {
 
 module.exports = {processMissles: processMissles, canGo: canGo}
 
-},{"../shared/constants.js":7}]},{},[1]);
+},{"./constants.js":7}]},{},[1]);

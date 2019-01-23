@@ -4,12 +4,15 @@
   "description": "A game for AI programming",
   "dependencies": {
     "body-parser": "^1.18.2",
+    "browserify": "^16.2.3",
+    "connect-redis": "^3.4.0",
     "cookie-parser": "^1.4.3",
     "express": "^4.15.2",
     "express-session": "^1.15.6",
     "mongodb": "^1.4.4",
     "monk": "^6.0.4",
-    "socket.io": "^2.0.4"
+    "socket.io": "^2.0.4",
+    "uuid": "^3.3.2"
   },
   "scripts": {
     "start": "npm run build && node index.js",

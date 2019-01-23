@@ -1,4 +1,4 @@
-const CONSTANTS = require('../shared/constants.js');
+const CONSTANTS = require('./constants.js');
 
 function processMissles(missles, map, percentage) {
   // console.log(percentage);

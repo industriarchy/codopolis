@@ -14,8 +14,7 @@ var socket = io();
 
 function goUp() {
   actions.act.up = model.s;
-  console.log("sending message");
-  socket.emit('message', "a message!");
+  console.log("going up");
 };
 
 function goDown() {

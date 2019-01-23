@@ -12,12 +12,11 @@ var c;
 var ctx;
 var socket = io();
 var outsideData;
-var hits = {};
 var mapSet = false;
-var resetWait = 0;
 let previousTick = Date.now();
 let actualTicks = 0;
 const tickLengthMs = 1000 / 30;
+let gameWon = {won: false};
 
 $( function() {
   c = document.getElementById("theView");
@@ -28,6 +27,7 @@ $( function() {
   model.creeps.dog = new Image();
   model.creeps.dog.src = '/static/images/dog.png';
   model.id = docCookies.getItem('userId');
+  initiateSocket();
 
   actions.assignListeners(c).then( () => {
     listenSocket();
@@ -50,13 +50,22 @@ const gameLoop = () => {
 };
 
 const update = (delta) => {
-  // Collect Data and render collected Data
-  actions.performActions(delta);
-  render.render(outsideData);
-  // Update Flags
-  // updateFlags(msg.flags);
-  // Detect Drain Flags
-  actions.detectFlag();
+  if (gameWon.won) {
+    render.gameWon(gameWon);
+  }
+  else {
+    // Collect Data and render collected Data
+    actions.performActions(delta);
+    render.render(outsideData);
+    // Detect Drain Flags
+    actions.detectFlag();
+  }
+}
+
+function initiateSocket() {
+  var data = { unit: {id: model.id, ll: model.flipped, newX: model.X, newY: model.Y,
+     missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag}, mapSet: mapSet };
+  socket.emit('appData', data);
 }
 
 function listenSocket() {
@@ -70,20 +79,15 @@ function listenSocket() {
 
       // determine if game is won
       if (msg.win && msg.win.won) {
-        render.gameWon(msg.win);
+        gameWon = msg.win;
+        // render.gameWon(msg.win);
       }
       else {
+        gameWon.won = false;
         // Emit your actions data
-        var data = { unit: {id: model.id, ll: model.flipped, up: actions.act.up, right: actions.act.right, newX: model.X, newY: model.Y,
+        var data = { unit: {id: model.id, ll: model.flipped, newX: model.X, newY: model.Y,
            missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag}, mapSet: mapSet };
         socket.emit('appData', data);
-
-        // Reset if dead
-        // if(msg.units[model.id].alive == false || resetWait > 1) {
-        //   resetWait = 0;
-        //   resetLoc();
-        // }
-        // resetWait++;
 
         if(model.needsReset) {
           resetLoc();
@@ -101,17 +105,18 @@ function listenSocket() {
           // Collect Data and render collected Data
           clearData();
           outsideData = msg;
+
+          // update the units and missles in the model
           model.units = msg.units;
           model.missles = msg.missles;
+
+          if(msg.units[model.id] && msg.units[model.id].resetLoc) {
+            model.needsReset = true;
+          }
         }
-        //
-        // // Update Flags
+
+        // Update Flags
         updateFlags(msg.flags);
-        // // Detect Drain Flags
-        // actions.detectFlag();
-        if(msg.units[model.id].resetLoc) {
-          model.needsReset = true;
-        }
       }
     }
   });
@@ -138,6 +143,7 @@ function resetLoc() {
     if(outsideData.units[model.id] != null) {
       model.X = outsideData.units[model.id].x;
       model.Y = outsideData.units[model.id].y;
+      console.log("reset location");
       model.needsReset = false;
     }
   }

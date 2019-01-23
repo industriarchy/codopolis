@@ -19,11 +19,10 @@ send = function(data) {
 }
 
 newUnit = function(data, db) {
-  console.log("hit addAI");
   var collection = db.get('ai');
   newUnit = data;
-  collection.insert(newUnit, function(data){
-      console.log("made", data);
+  collection.insert(newUnit, function(err, result){
+      console.log("made", result);
   });
 }
 

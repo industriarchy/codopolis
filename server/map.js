@@ -19,6 +19,7 @@ return new Promise( function(resolve, reject) {
       setMap(map);
       columns = map.length;
       rows = map[0].length;
+      console.log("map set");
       resolve(MAP);
     });
   });
@@ -107,6 +108,7 @@ function initiateMap() {
 };
 
 function change(type, x, y) {
+  console.log("changing", x, y, "map: ", MAP[0]);
   MAP[x][y] = type;
 };
 
