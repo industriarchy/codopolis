@@ -28,6 +28,7 @@ $( function() {
   model.creeps.dog = new Image();
   model.creeps.dog.src = '/static/images/dog.png';
   model.id = docCookies.getItem('userId');
+  document.getElementById('user').innerHTML = model.id;
   initiateSocket();
 
   actions.assignListeners(c).then( () => {
@@ -654,7 +655,6 @@ function drawMap() {
     for(let j=topBound(); j<bottomBound(); j++) {
       if(model.MAP[i][j].a == 1){
         flag(i*100+x0, j*100+y0, '#f00', model.MAP[i][j].h);
-        // flag(i*100+x0, j*100+y0, '#f00', 100);
       }
       else if(model.MAP[i][j].a == 2){
         smallTree(i*100+x0, j*100+y0);
@@ -824,9 +824,10 @@ function drawData() {
       for(var i=0;i<keys.length;i++){
         var key= keys[i];
 
+        // console.log("units: ", model.units);
         // check if unit is logged in
         if(model.units[key]) {
-          if(model.units[key].loggedIn) {
+          if(model.units[key].loggedIn && !model.units[key].ai) {
             if(key != model.id) {
               if(model.units[key].ll) {
                 ctx.drawImage(model.fDude, model.units[key].x - model.X + 500, model.units[key].y - model.Y + 350, 100, 100);
@@ -857,7 +858,6 @@ function drawData() {
             }
           }
           else if(model.units[key].ai) {
-            // console.log("hit ai", model.creeps.dog);s
             ctx.drawImage(model.creeps.dog, model.units[key].x - model.X + 500, model.units[key].y - model.Y + 350, 136, 100);
           }
         }

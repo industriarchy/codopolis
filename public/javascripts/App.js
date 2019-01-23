@@ -27,6 +27,7 @@ $( function() {
   model.creeps.dog = new Image();
   model.creeps.dog.src = '/static/images/dog.png';
   model.id = docCookies.getItem('userId');
+  document.getElementById('user').innerHTML = model.id;
   initiateSocket();
 
   actions.assignListeners(c).then( () => {

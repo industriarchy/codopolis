@@ -157,16 +157,16 @@ router.post('/demo', function(req, res) {
 });
 
 function loadChar(id, db) {
-  return new Promise( function(resolve, reject) {
-    // map.mapData.units[id] = Object.assign({}, formats.unit);
-    // resolve(false);
+  return new Promise( function(resolve) {
     const collection = db.get('userlist');
     collection.findOne({ 'username' : id }, {}, function(e,docs){
       if(e === null) {
         if(docs != null) {
           console.log("unit found", docs);
           map.mapData.units[id] = docs.char;
-          resolve(true);
+          ai.load(id, db).then( () => {
+            resolve(true);
+          });
         }
         else {
           map.mapData.units[id] = Object.assign({}, formats.unit);

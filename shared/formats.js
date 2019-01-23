@@ -3,6 +3,7 @@ const map = require('../server/map.js');
 
 const formats = {
   unit: {
+    ai: false,
     x: map.neutralSpawn.x || 500,
     y: map.neutralSpawn.y || 500,
     ll: true,
@@ -21,6 +22,8 @@ const formats = {
   build: { type: 'g', x: 0, y: 0 },
   aiProfiles: {
     pet: {
+      ai: true,
+      img: 'dog',
       owner: "",
       x: 600,
       y: 350,
@@ -30,6 +33,7 @@ const formats = {
       health: 100,
       timeout: 0,
       alive: false,
+      loggedIn: true,
       damage: 20,
       speed: 1,
       atkRange: 10,

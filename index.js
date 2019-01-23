@@ -75,6 +75,9 @@ map.readMap("game");
 // load characters
 loadChars();
 
+// load AIs
+loadAIs();
+
 // Setup Routing for main page
 app.get('/', function(req, res){
   if(!req.session.user) {
@@ -193,6 +196,7 @@ function batchSend(socket) {
   pushIfNew(socket.id);
   if(!alreadySending) {
     setInterval(() => {
+      // console.log("units", map.mapData.units);
       if(numConnected > 0) {
         count++;
         if(count >= CONSTANTS.SAVEINTERVAL) {
@@ -275,13 +279,13 @@ function loadChars() {
   });
 }
 
-function loadAI() {
+function loadAIs() {
   return new Promise( function(resolve, reject) {
     aiLoaded = true;
     var collection = db.get('ai');
     collection.find({} , function(err, result){
       result.map((unit) => {
-        map.mapData.units[unit.username] = unit.char;
+        map.mapData.units[unit._id] = unit;
       });
       resolve(map.mapData.units);
     });

@@ -2,6 +2,9 @@
 // ================================ AI =========================================
 // -----------------------------------------------------------------------------
 
+
+var map = require('./map.js');
+
 send = function(data) {
   console.log(data);
   if(data.cmd == 'getUser') {
@@ -42,9 +45,28 @@ act = function(data) {
 
 }
 
+function loadAi(id, db) {
+  return new Promise( function(resolve) {
+    const collection = db.get('ai');
+    collection.findOne({ 'owner' : id }, {}, function(e,docs){
+      if(e === null) {
+        if(docs != null) {
+          console.log("ai found", docs);
+          map.mapData.units[docs._id] = docs;
+          resolve(true);
+        }
+        else {
+          resolve(false);
+        }
+      }
+    });
+  });
+}
+
 const ai = {
   send: send,
-  new: newUnit
+  new: newUnit,
+  load: loadAi
 };
 
 
