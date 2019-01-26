@@ -82,7 +82,7 @@ loadAIs();
 app.get('/', function(req, res){
   if(!req.session.user) {
     // Show Login
-    res.sendFile(__dirname + '/login.html');
+    res.sendFile(__dirname + '/public/html/login.html');
   }
   else {
     res.cookie('userId', req.session.user);
@@ -90,11 +90,11 @@ app.get('/', function(req, res){
     if (!charLoaded(req.session.user)) {
       console.log("loading character");
       users.loadChar(req.session.user, db).then( () => {
-        res.sendFile(__dirname + '/index.html');
+        res.sendFile(__dirname + '/public/html/index.html');
       });
     }
     else {
-      res.sendFile(__dirname + '/index.html');
+      res.sendFile(__dirname + '/public/html/index.html');
     }
   }
 });

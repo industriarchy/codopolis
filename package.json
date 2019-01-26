@@ -15,8 +15,8 @@
     "uuid": "^3.3.2"
   },
   "scripts": {
-    "start": "npm run build && node index.js",
-    "build": "browserify public/javascripts/App.js -o public/javascripts/bundle.js",
+    "start": "npm run build && node src/index.js",
+    "build": "browserify src/public/javascripts/App.js -o src/public/javascripts/bundle.js",
     "server": "mongod --dbpath data"
   }
 }

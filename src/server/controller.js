@@ -89,16 +89,13 @@ function processHits(theUnit, key) {
 function processMovement(theUnit) {
   if (theUnit.x && theUnit.y && theUnit.newX && theUnit.newY) {
     if (functions.canGo(theUnit.newX, theUnit.newY, 60, 60, map.map) && inRange(theUnit.x, theUnit.y, theUnit.newX, theUnit.newY, SharedConst.MAXSPEED)) {
-      if(theUnit.ai)
-        console.log("movement processing", theUnit);
       theUnit.x = theUnit.newX;
       theUnit.y = theUnit.newY;
       theUnit.resetLoc = false;
     }
     else {
       if(theUnit.ai)
-        console.log("not able to go", theUnit);
-      console.log("sending reset");
+      // console.log("sending reset");
       theUnit.resetLoc = true;
     }
   }
