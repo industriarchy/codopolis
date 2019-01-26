@@ -19,6 +19,8 @@ var model = {
   dude: dude,
   fDude: fDude,
   creeps: {},
+  ai: {},
+  pets: [],
   flipped: false,
   timeSet: Date.now(),    // unused?
   needsReset: true,

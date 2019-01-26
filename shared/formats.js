@@ -31,11 +31,10 @@ const formats = {
       right: 0,
       up: 0,
       health: 100,
-      timeout: 0,
       alive: false,
       loggedIn: true,
       damage: 20,
-      speed: 1,
+      maxSpeed: 20,
       atkRange: 10,
       atkSpeed: 1,
       program: ''

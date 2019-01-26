@@ -1,8 +1,7 @@
 var express = require('express');
 var router = express.Router();
-const aiProfiles = require('../server/aiProfiles');
-const ai = require('../server/ai');
-var map = require('../server/map.js');
+const ai = require('./ai');
+var map = require('./map.js');
 var uuidv1 = require('uuid/v1');
 var formats = require('../shared/formats');
 const utils = require('../server/utility');
@@ -175,22 +174,6 @@ function loadChar(id, db) {
       }
     });
   });
-}
-
-function loadAI(id, userid) {
-  console.log("made ai");
-  map.mapData.units[id] = {
-    owner: userid,
-    x: 500,
-    y: 350,
-    ll: true,
-    right: 0,
-    up: 0,
-    health: 100,
-    timeout: 0,
-    alive: true,
-    ai: true
-  }
 }
 
 checkUser = (user, collection) => {

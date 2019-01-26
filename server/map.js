@@ -125,6 +125,7 @@ function changeDB(type, x, y, db) {
 var mapData = {
   curId: 0,
   units: {},
+  ai: {},
   curMId: 0,
   missles: {},
   flags: flags,

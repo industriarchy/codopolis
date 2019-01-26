@@ -65,7 +65,8 @@ const update = (delta) => {
 
 function initiateSocket() {
   var data = { unit: {id: model.id, ll: model.flipped, newX: model.X, newY: model.Y,
-     missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag}, mapSet: mapSet };
+    missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag},
+    mapSet: mapSet };
   socket.emit('appData', data);
 }
 
@@ -85,9 +86,14 @@ function listenSocket() {
       }
       else {
         gameWon.won = false;
+        // Process AI
+        model.ai = msg.ai;
+        // debugger;
+        actions.proccessAI();
         // Emit your actions data
         var data = { unit: {id: model.id, ll: model.flipped, newX: model.X, newY: model.Y,
-           missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag}, mapSet: mapSet };
+           missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag},
+           ai: aiToSend(), mapSet: mapSet };
         socket.emit('appData', data);
 
         if(model.needsReset) {
@@ -155,3 +161,9 @@ function clearData() {
   actions.build.type = 0;
   actions.drainFlag = {};
 }
+
+const aiToSend = () => {
+  return model.pets.map( pet => {
+    return {id: pet._id, ll: pet.ll, newX: pet.x, newY: pet.y, attack: pet.attack, alive: true};
+  });
+};

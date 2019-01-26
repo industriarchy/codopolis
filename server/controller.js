@@ -5,18 +5,18 @@ const utils = require('./utility.js');
 const formats = require('../shared/formats.js')
 const functions = require('../shared/functions.js');
 const SharedConst = require('../shared/constants.js');
-const drainRange = 100;
 let flagDrains = [];
 
 function processData() {
+  clearActions();
   processUnits();
+  processAI();
   processMissles();
   processFlags();
   processBuilds();
 }
 
 function processUnits() {
-  clearActions();
   // needs to test hits sent from front ends
   if(map.mapData.units != null) {
     var keys = Object.keys(map.mapData.units);
@@ -36,36 +36,8 @@ function processUnits() {
         }
         // Only look at units currently logged in
         if(theUnit.loggedIn == true) {
-          // Process hits
-          var keys2 = Object.keys(map.mapData.missles);
-          for(let j=0; j<keys2.length; j++) {
-            var key2 = keys2[j];
-            var missle = map.mapData.missles[key2];
-            if(utils.validate(formats.missles, missle)) {
-              if(missle.sender != key) {
-                if(hitUnit(missle.curX, missle.curY, theUnit)) {
-                  delete map.mapData.missles[key2];
-                  theUnit.health -= SharedConst.DAMAGE;
-                  if(theUnit.health < 0) {
-                    die(key);
-                  }
-                }
-              }
-            }
-          }
-
-          // Process movement
-          if (theUnit.x && theUnit.y && theUnit.newX && theUnit.newY) {
-            if (functions.canGo(theUnit.newX, theUnit.newY, 60, 60, map.map) && inRange(theUnit.x, theUnit.y, theUnit.newX, theUnit.newY, SharedConst.MAXSPEED)) {
-                theUnit.x = theUnit.newX;
-                theUnit.y = theUnit.newY;
-                theUnit.resetLoc = false;
-            }
-            else {
-              console.log("sending reset");
-              theUnit.resetLoc = true;
-            }
-          }
+          processHits(theUnit, key);
+          processMovement(theUnit);
 
           // Add any flag Drains
           if(theUnit.drainFlag) {
@@ -73,10 +45,6 @@ function processUnits() {
               flagDrains.push(theUnit.drainFlag);
             }
           }
-        }
-        // Process AI
-        else if(theUnit.ai) {
-
         }
       }
     }
@@ -89,17 +57,51 @@ function validFlagDrain(theUnit) {
   const flag = map.mapData.flags[theUnit.drainFlag.id];
   if(!flag)
     return false;
-  if(utils.dist(theUnit.x+50, theUnit.y+80, flag.x*100+50, flag.y*100+50) < 60)
+  if(utils.dist(theUnit.x+50, theUnit.y+80, flag.x*100+50, flag.y*100+50) < SharedConst.DRAINRANGE)
     return true;
   else return false;
 }
 
-function valid(unit) {
-
-}
 
 function processMissles() {
   map.mapData.missles = functions.processMissles(map.mapData.missles, map.map, 1);
+}
+
+function processHits(theUnit, key) {
+  var keys2 = Object.keys(map.mapData.missles);
+  for(let j=0; j<keys2.length; j++) {
+    var key2 = keys2[j];
+    var missle = map.mapData.missles[key2];
+    if(utils.validate(formats.missles, missle)) {
+      if(missle.sender != key) {
+        if(hitUnit(missle.curX, missle.curY, theUnit)) {
+          delete map.mapData.missles[key2];
+          theUnit.health -= SharedConst.DAMAGE;
+          if(theUnit.health < 0) {
+            die(key);
+          }
+        }
+      }
+    }
+  }
+}
+
+function processMovement(theUnit) {
+  if (theUnit.x && theUnit.y && theUnit.newX && theUnit.newY) {
+    if (functions.canGo(theUnit.newX, theUnit.newY, 60, 60, map.map) && inRange(theUnit.x, theUnit.y, theUnit.newX, theUnit.newY, SharedConst.MAXSPEED)) {
+      if(theUnit.ai)
+        console.log("movement processing", theUnit);
+      theUnit.x = theUnit.newX;
+      theUnit.y = theUnit.newY;
+      theUnit.resetLoc = false;
+    }
+    else {
+      if(theUnit.ai)
+        console.log("not able to go", theUnit);
+      console.log("sending reset");
+      theUnit.resetLoc = true;
+    }
+  }
 }
 
 function processFlags() {
@@ -121,6 +123,34 @@ function processFlags() {
       }
     }
   });
+}
+
+function processAI() {
+  // needs to test hits sent from front ends
+  if(map.mapData.ai != null) {
+    var keys = Object.keys(map.mapData.ai);
+    for(var i=0;i<keys.length;i++){
+      let key = keys[i];
+
+      if(!utils.validate(formats.aiProfiles.pet, map.mapData.ai[key])) {
+        console.log("deleting ai", map.mapData.ai[key]);
+        delete map.mapData.ai[key];
+      }
+
+      if(map.mapData.ai[key]) {
+        theAI = map.mapData.ai[key];
+        processHits(theAI, key);
+        processMovement(theAI);
+
+        // // Add any flag Drains
+        // if(theAI.drainFlag) {
+        //   if(validFlagDrain(theAI)) {
+        //     flagDrains.push(theAI.drainFlag);
+        //   }
+        // }
+      }
+    }
+  }
 }
 
 function processBuilds() {

@@ -66,7 +66,8 @@ const update = (delta) => {
 
 function initiateSocket() {
   var data = { unit: {id: model.id, ll: model.flipped, newX: model.X, newY: model.Y,
-     missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag}, mapSet: mapSet };
+    missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag},
+    mapSet: mapSet };
   socket.emit('appData', data);
 }
 
@@ -86,9 +87,14 @@ function listenSocket() {
       }
       else {
         gameWon.won = false;
+        // Process AI
+        model.ai = msg.ai;
+        // debugger;
+        actions.proccessAI();
         // Emit your actions data
         var data = { unit: {id: model.id, ll: model.flipped, newX: model.X, newY: model.Y,
-           missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag}, mapSet: mapSet };
+           missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag},
+           ai: aiToSend(), mapSet: mapSet };
         socket.emit('appData', data);
 
         if(model.needsReset) {
@@ -157,6 +163,12 @@ function clearData() {
   actions.drainFlag = {};
 }
 
+const aiToSend = () => {
+  return model.pets.map( pet => {
+    return {id: pet._id, ll: pet.ll, newX: pet.x, newY: pet.y, attack: pet.attack, alive: true};
+  });
+};
+
 },{"./actions":2,"./cookies":3,"./model":4,"./render":5,"./utility":6}],2:[function(require,module,exports){
 // -----------------------------------------------------------------------------
 // ============================== ACTIONS ======================================
@@ -174,7 +186,6 @@ var socket = io();
 
 function goUp() {
   actions.act.up = model.s;
-  console.log("going up");
 };
 
 function goDown() {
@@ -284,7 +295,6 @@ function placeFence(x, y) {
     }
     actions.build = {type: fence, x: parseInt(x/100), y: parseInt(y/100)};
   }
-  console.log(actions.build);
 }
 
 function insideBlock(x, y, x1, x2, y1, y2) {
@@ -293,17 +303,6 @@ function insideBlock(x, y, x1, x2, y1, y2) {
     y > y1 && y < y2) {
     return true; }
   else { return false; }
-}
-
-// Logout function
-function logout() {
-  $.ajax({
-      type: 'POST',
-      url: '/users/logout',
-      dataType: 'JSON'
-  }).done(function( response ) {
-      location.reload();
-  });
 }
 
 function detectFlag() {
@@ -345,7 +344,6 @@ function performActions(delta) {
   }
   // Move  missles
   processMissles(percentage);
-
 };
 
 
@@ -353,79 +351,121 @@ function processMissles(percentage) {
   model.missles = functions.processMissles(model.missles, model.MAP, percentage);
 }
 
-// If all four corners are clear return true, else false
-// function canGo(iX, iY) {
-//   if(isClear(model.MAP[parseInt((iX+20)/100)][parseInt(iY/100)])
-//   && isClear(model.MAP[parseInt((iX+20)/100)][parseInt((iY+99)/100)])
-//   && isClear(model.MAP[parseInt((iX+80)/100)][parseInt((iY)/100)])
-//   && isClear(model.MAP[parseInt((iX+80)/100)][parseInt((iY+99)/100)])) {
-//     return true;
-//   }
-//   return false;
-// };
-//
-// function isClear(tile) {
-//   if((tile.t == 0 || tile.t == 3 || tile.y == 7) && tile.a != 2)
-//     return true;
-//   return false;
-// };
+// Logout function
+function logout() {
+  $.ajax({
+      type: 'POST',
+      url: '/users/logout',
+      dataType: 'JSON'
+  }).done(function( response ) {
+      location.reload();
+  });
+}
+
+const assignCode = (e) => {
+  let code = document.getElementById('code').value;
+  let id = document.getElementById('petSelect').value;
+  let pet = model.pets.find((elem) => { return elem._id == id })
+  if (pet) pet.code = code;
+};
+
+const processAI = () => {
+  if (model.pets.length < 1) {
+    findPets();
+  }
+  else {
+    model.pets.forEach( (pet) => {
+      updatePet(pet);
+      if (pet.code) {
+        eval(pet.code);
+      }
+    })
+  }
+};
+
+const findPets = () => {
+  if (model.ai) {
+    let ids = Object.keys(model.ai);
+    ids.forEach( (id) => {
+      if (model.ai[id].owner == model.id) {
+        model.pets.push(model.ai[id]);
+        addSelectOption(id);
+      }
+    });
+  }
+};
+
+const updatePet = (pet) => {
+  if(model.ai[pet._id]) {
+    pet.x = model.ai[pet._id].x;
+    pet.y = model.ai[pet._id].y;
+    pet.health = model.ai[pet._id].health;
+    pet.alive = model.ai[pet._id].alive;
+  }
+}
+
+const addSelectOption = (option) => {
+  document.getElementById('petSelect').innerHTML += '<option>' + option + '</option>';
+};
+
+const assignListeners = (c) => {
+  return new Promise( function(resolve, reject) {
+    document.getElementById('logout').addEventListener('click', logout);
+    document.getElementById('assignCode').addEventListener('click', assignCode);
+    c.addEventListener('click', (event) => {
+      var clickX = event.offsetX;
+      var clickY = event.offsetY;
+      if(actions.placingF) {
+        placeFence(clickX, clickY);
+      }
+      else {
+        shoot(clickX, clickY);
+      }
+    });
+    c.addEventListener('touchstart', (event) => {
+      initiateDrag(event);
+    });
+    c.addEventListener('touchend', (event) => {
+      endDrag(event);
+    });
+    c.addEventListener('touchmove', (event) => {
+      dragging(event);
+    });
+    c.addEventListener('mousemove', (event) => {
+      actions.mouse = event;
+    });
+    document.addEventListener('keydown', (event) => {
+      const keyName = event.key;
+      if(keyName == "w") {
+        goUp();
+      }
+      if(keyName == "s") {
+        goDown();
+      }
+      if(keyName == "d") {
+        goRight();
+      }
+      if(keyName == "a") {
+        goLeft();
+      }
+      if(keyName == "f") {
+        actions.placingF = !actions.placingF;
+      }
+    });
+
+    var a = document.addEventListener('keyup', (event) => {
+      if(event.key == "w" || event.key == "s")
+        actions.act.up = 0;
+      if(event.key == "a" || event.key == "d")
+        actions.act.right = 0;
+    });
+    resolve(a);
+  });
+};
 
 // Export functions
 var actions = {
-
-  assignListeners: function(c) {
-    return new Promise( function(resolve, reject) {
-      document.getElementById("logout").addEventListener("click", logout);
-      c.addEventListener('click', (event) => {
-        var clickX = event.offsetX;
-        var clickY = event.offsetY;
-        if(actions.placingF) {
-          placeFence(clickX, clickY);
-        }
-        else {
-          shoot(clickX, clickY);
-        }
-      });
-      c.addEventListener('touchstart', (event) => {
-        initiateDrag(event);
-      });
-      c.addEventListener('touchend', (event) => {
-        endDrag(event);
-      });
-      c.addEventListener('touchmove', (event) => {
-        dragging(event);
-      });
-      c.addEventListener('mousemove', (event) => {
-        actions.mouse = event;
-      });
-      document.addEventListener('keydown', (event) => {
-        const keyName = event.key;
-        if(keyName == "w") {
-          goUp();
-        }
-        if(keyName == "s") {
-          goDown();
-        }
-        if(keyName == "d") {
-          goRight();
-        }
-        if(keyName == "a") {
-          goLeft();
-        }
-        if(keyName == "f") {
-          actions.placingF = !actions.placingF;
-        }
-      });
-
-      var a = document.addEventListener('keyup', (event) => {
-        if(event.key == "w" || event.key == "s")
-          actions.act.up = 0;
-        if(event.key == "a" || event.key == "d")
-          actions.act.right = 0;
-      });
-      resolve(a);
-    });
-  },
+  assignListeners: assignListeners,
   performActions: performActions,
   act: {                           // actions
     up: 0,
@@ -442,7 +482,9 @@ var actions = {
     x: 0, y: 0
   },
   detectFlag: detectFlag,
-  drainFlag: {}
+  drainFlag: {},
+  aiActions: {},
+  proccessAI: processAI
 }
 
 module.exports = actions;
@@ -564,6 +606,8 @@ var model = {
   dude: dude,
   fDude: fDude,
   creeps: {},
+  ai: {},
+  pets: [],
   flipped: false,
   timeSet: Date.now(),    // unused?
   needsReset: true,
@@ -817,100 +861,91 @@ function drawOnTop() {
 function drawData() {
   // Draw the Outside Data
   if(outsideData != null) {
+    drawPlayers();
+    drawAI();
+    drawMissles();
+    drawHealth();
+    drawBuilds();
+  }
+  drawSelf();
+};
 
-    // Draw the Players
-    if(model.units != null) {
-      var keys = Object.keys(model.units);
-      for(var i=0;i<keys.length;i++){
-        var key= keys[i];
+function drawPlayers() {
+  if(model.units != null) {
+    var keys = Object.keys(model.units);
+    for(var i=0;i<keys.length;i++){
+      var key= keys[i];
 
-        // console.log("units: ", model.units);
-        // check if unit is logged in
-        if(model.units[key]) {
-          if(model.units[key].loggedIn && !model.units[key].ai) {
-            if(key != model.id) {
-              if(model.units[key].ll) {
-                ctx.drawImage(model.fDude, model.units[key].x - model.X + 500, model.units[key].y - model.Y + 350, 100, 100);
-              }
-              else {
-                ctx.drawImage(model.dude, model.units[key].x - model.X + 500, model.units[key].y - model.Y + 350, 100, 100);
-              }
-              ctx.fillStyle = '#a32';
-              ctx.fillRect(model.units[key].x+24 - model.X + 500,model.units[key].y-15 - model.Y + 350,model.units[key].health/2, 5);
+      // check if unit is logged in
+      if(model.units[key]) {
+        if(model.units[key].loggedIn && !model.units[key].ai) {
+          if(key != model.id) {
+            if(model.units[key].ll) {
+              ctx.drawImage(model.fDude, model.units[key].x - model.X + 500, model.units[key].y - model.Y + 350, 100, 100);
             }
-
-            //Check for hit
-            var myMissles = model.missles;
-            hits = {};
-            if(myMissles != null && key != model.id) {
-              var keys2 = Object.keys(myMissles);
-              for(var j=0; j<keys2.length; j++) {
-                var key2 = keys2[j];
-
-                // Need to actually run a validate here
-                if(myMissles[key2].curX != null) {
-                  if(hitUnit(myMissles[key2].curX, myMissles[key2].curY, key)) {
-                    // need to send hit
-                    hits = {sender: model.id, missle: key2, unit: key};
-                  }
-                }
-              }
+            else {
+              ctx.drawImage(model.dude, model.units[key].x - model.X + 500, model.units[key].y - model.Y + 350, 100, 100);
             }
-          }
-          else if(model.units[key].ai) {
-            ctx.drawImage(model.creeps.dog, model.units[key].x - model.X + 500, model.units[key].y - model.Y + 350, 136, 100);
+            ctx.fillStyle = '#a32';
+            ctx.fillRect(model.units[key].x+24 - model.X + 500,model.units[key].y-15 - model.Y + 350,model.units[key].health/2, 5);
           }
         }
       }
     }
+  }
+}
 
-    // draw the projectiles
-    if(model.missles != null) {
-      var keys = Object.keys(model.missles);
-      for(var j=0;j<keys.length;j++){
-        key = keys[j];
-        let missle = model.missles[key];
-        ctx.beginPath();
-        ctx.arc(missle.curX - model.X + 500, missle.curY - model.Y + 350, 5, 0, 2 * Math.PI, false);
-        ctx.fillStyle = 'black';
-        ctx.fill();
-        ctx.stroke();
+function drawAI() {
+  if(model.ai != null) {
+    var keys = Object.keys(model.ai);
+    for(var i=0;i<keys.length;i++){
+      var key= keys[i];
+      if(model.ai[key] && model.ai[key].ai) {
+        ctx.drawImage(model.creeps.dog, model.ai[key].x - model.X + 500, model.ai[key].y - model.Y + 350, 136, 100);
       }
-    }
-
-    // draw health
-    if(model.units[model.id] != null) {
       ctx.fillStyle = '#a32';
-      ctx.fillRect(model.cX+24, model.cY-15,model.units[model.id].health/2, 5);
-    }
-
-    // Draw builds
-    if(outsideData.builds != null) {
-      model.MAP[outsideData.builds.x][outsideData.builds.y] = outsideData.builds.type;
+      ctx.fillRect(model.ai[key].x+24 - model.X + 500,model.ai[key].y-15 - model.Y + 350,model.ai[key].health/2, 5);
     }
   }
+}
+
+function drawMissles() {
+  if(model.missles != null) {
+    var keys = Object.keys(model.missles);
+    for(var j=0;j<keys.length;j++){
+      key = keys[j];
+      let missle = model.missles[key];
+      ctx.beginPath();
+      ctx.arc(missle.curX - model.X + 500, missle.curY - model.Y + 350, 5, 0, 2 * Math.PI, false);
+      ctx.fillStyle = 'black';
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+}
+
+function drawHealth() {
+  if(model.units[model.id] != null) {
+    ctx.fillStyle = '#a32';
+    ctx.fillRect(model.cX+24, model.cY-15,model.units[model.id].health/2, 5);
+  }
+}
+
+function drawBuilds() {
+  // Draw builds
+  if(outsideData.builds != null) {
+    model.MAP[outsideData.builds.x][outsideData.builds.y] = outsideData.builds.type;
+  }
+}
+
+function drawSelf() {
   if(model.flipped) {
     ctx.drawImage(model.fDude, model.cX, model.cY, 100, 100);
   }
   else {
     ctx.drawImage(model.dude, model.cX, model.cY, 100, 100);
   }
-};
-
-function hitUnit(x, y, unit) {
-  var xMin = model.units[unit].x+50-(model.unitWidth/2);
-  var xMax = model.units[unit].x+50+(model.unitWidth/2);
-  var yMin = model.units[unit].y+50-(model.unitHeight/2);
-  var yMax = model.units[unit].y+50+(model.unitHeight/2);
-  if(x > xMin && x < xMax && y > yMin && y < yMax) {
-    return true;
-  }
-  return false;
-};
-
-function die() {
-
-};
+}
 
 function leftBound() {
   if(model.X-500 < 0)

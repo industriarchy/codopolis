@@ -22,7 +22,7 @@ var session = require('express-session');
 var cookieParser = require('cookie-parser');
 var RedisStore = require("connect-redis")(session);
 var map = require('./server/map.js');
-var users = require('./routes/users');
+var users = require('./server/users');
 var utils = require('./server/utility.js');
 var controller = require('./server/controller.js');
 const CONSTANTS = require('./shared/constants.js');
@@ -54,9 +54,9 @@ app.use(function (req, res, next) {
 app.use('/users', users.router);
 
 // Global Variables
-var numConnected = 0;
-var alreadySending = false;
-var sAddresses = {};
+let numConnected = 0;
+let alreadySending = false;
+let sAddresses = {};
 let charsLoaded = false;
 aiMade = false;
 let win = {won: false, user: "", reset: CONSTANTS.RESETINTERVAL};
@@ -102,9 +102,9 @@ app.get('/', function(req, res){
 io.on('connection', function(socket){
   let newClient = {socket: socket.id};
   pushIfNew(newClient);
-  socket.on('ai', function(data) {
-    ai.send(data);
-  })
+  // socket.on('ai', function(data) {
+  //   ai.send(data);
+  // })
 
   socket.on('appData', function(msg){
     // console.log(msg);
@@ -125,9 +125,6 @@ io.on('connection', function(socket){
     if(msg.unit.alive == true) {
       if(map.mapData.units[msg.unit.id] != null) {
         map.mapData.units[msg.unit.id].alive = true;
-      }
-      else {
-        // console.log("unit nulled", msg.unit);
       }
     }
 
@@ -150,6 +147,17 @@ io.on('connection', function(socket){
     // if building add a wall
     if(msg.unit.build.type != 0) {
       controller.build(msg);
+    }
+
+    if(msg.ai) {
+      msg.ai.forEach( ai => {
+        if(map.mapData.ai[ai.id]) {
+          map.mapData.ai[ai.id].newX = ai.newX;
+          map.mapData.ai[ai.id].newY = ai.newY;
+          map.mapData.ai[ai.id].ll = ai.ll;
+          map.mapData.ai[ai.id].loggedIn = true;
+        }
+      });
     }
 
     // TODO: Push hit checking to the front end and validate here
@@ -228,6 +236,7 @@ function batchSend(socket) {
           else {
             sAddresses[key].idle++;
             sAddresses[key].data.units = map.mapData.units;
+            sAddresses[key].data.ai = map.mapData.ai;
             sAddresses[key].data.missles = map.mapData.missles;
             sAddresses[key].data.builds = map.mapData.builds;
             sAddresses[key].data.idle = sAddresses[key].idle;
@@ -284,10 +293,11 @@ function loadAIs() {
     aiLoaded = true;
     var collection = db.get('ai');
     collection.find({} , function(err, result){
-      result.map((unit) => {
-        map.mapData.units[unit._id] = unit;
+      result.map((ai) => {
+        console.log("Loading AI", ai);
+        map.mapData.ai[ai._id] = ai;
       });
-      resolve(map.mapData.units);
+      resolve(map.mapData.ai);
     });
   });
 }

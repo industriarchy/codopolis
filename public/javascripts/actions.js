@@ -14,7 +14,6 @@ var socket = io();
 
 function goUp() {
   actions.act.up = model.s;
-  console.log("going up");
 };
 
 function goDown() {
@@ -124,7 +123,6 @@ function placeFence(x, y) {
     }
     actions.build = {type: fence, x: parseInt(x/100), y: parseInt(y/100)};
   }
-  console.log(actions.build);
 }
 
 function insideBlock(x, y, x1, x2, y1, y2) {
@@ -133,17 +131,6 @@ function insideBlock(x, y, x1, x2, y1, y2) {
     y > y1 && y < y2) {
     return true; }
   else { return false; }
-}
-
-// Logout function
-function logout() {
-  $.ajax({
-      type: 'POST',
-      url: '/users/logout',
-      dataType: 'JSON'
-  }).done(function( response ) {
-      location.reload();
-  });
 }
 
 function detectFlag() {
@@ -185,7 +172,6 @@ function performActions(delta) {
   }
   // Move  missles
   processMissles(percentage);
-
 };
 
 
@@ -193,79 +179,121 @@ function processMissles(percentage) {
   model.missles = functions.processMissles(model.missles, model.MAP, percentage);
 }
 
-// If all four corners are clear return true, else false
-// function canGo(iX, iY) {
-//   if(isClear(model.MAP[parseInt((iX+20)/100)][parseInt(iY/100)])
-//   && isClear(model.MAP[parseInt((iX+20)/100)][parseInt((iY+99)/100)])
-//   && isClear(model.MAP[parseInt((iX+80)/100)][parseInt((iY)/100)])
-//   && isClear(model.MAP[parseInt((iX+80)/100)][parseInt((iY+99)/100)])) {
-//     return true;
-//   }
-//   return false;
-// };
-//
-// function isClear(tile) {
-//   if((tile.t == 0 || tile.t == 3 || tile.y == 7) && tile.a != 2)
-//     return true;
-//   return false;
-// };
+// Logout function
+function logout() {
+  $.ajax({
+      type: 'POST',
+      url: '/users/logout',
+      dataType: 'JSON'
+  }).done(function( response ) {
+      location.reload();
+  });
+}
+
+const assignCode = (e) => {
+  let code = document.getElementById('code').value;
+  let id = document.getElementById('petSelect').value;
+  let pet = model.pets.find((elem) => { return elem._id == id })
+  if (pet) pet.code = code;
+};
+
+const processAI = () => {
+  if (model.pets.length < 1) {
+    findPets();
+  }
+  else {
+    model.pets.forEach( (pet) => {
+      updatePet(pet);
+      if (pet.code) {
+        eval(pet.code);
+      }
+    })
+  }
+};
+
+const findPets = () => {
+  if (model.ai) {
+    let ids = Object.keys(model.ai);
+    ids.forEach( (id) => {
+      if (model.ai[id].owner == model.id) {
+        model.pets.push(model.ai[id]);
+        addSelectOption(id);
+      }
+    });
+  }
+};
+
+const updatePet = (pet) => {
+  if(model.ai[pet._id]) {
+    pet.x = model.ai[pet._id].x;
+    pet.y = model.ai[pet._id].y;
+    pet.health = model.ai[pet._id].health;
+    pet.alive = model.ai[pet._id].alive;
+  }
+}
+
+const addSelectOption = (option) => {
+  document.getElementById('petSelect').innerHTML += '<option>' + option + '</option>';
+};
+
+const assignListeners = (c) => {
+  return new Promise( function(resolve, reject) {
+    document.getElementById('logout').addEventListener('click', logout);
+    document.getElementById('assignCode').addEventListener('click', assignCode);
+    c.addEventListener('click', (event) => {
+      var clickX = event.offsetX;
+      var clickY = event.offsetY;
+      if(actions.placingF) {
+        placeFence(clickX, clickY);
+      }
+      else {
+        shoot(clickX, clickY);
+      }
+    });
+    c.addEventListener('touchstart', (event) => {
+      initiateDrag(event);
+    });
+    c.addEventListener('touchend', (event) => {
+      endDrag(event);
+    });
+    c.addEventListener('touchmove', (event) => {
+      dragging(event);
+    });
+    c.addEventListener('mousemove', (event) => {
+      actions.mouse = event;
+    });
+    document.addEventListener('keydown', (event) => {
+      const keyName = event.key;
+      if(keyName == "w") {
+        goUp();
+      }
+      if(keyName == "s") {
+        goDown();
+      }
+      if(keyName == "d") {
+        goRight();
+      }
+      if(keyName == "a") {
+        goLeft();
+      }
+      if(keyName == "f") {
+        actions.placingF = !actions.placingF;
+      }
+    });
+
+    var a = document.addEventListener('keyup', (event) => {
+      if(event.key == "w" || event.key == "s")
+        actions.act.up = 0;
+      if(event.key == "a" || event.key == "d")
+        actions.act.right = 0;
+    });
+    resolve(a);
+  });
+};
 
 // Export functions
 var actions = {
-
-  assignListeners: function(c) {
-    return new Promise( function(resolve, reject) {
-      document.getElementById("logout").addEventListener("click", logout);
-      c.addEventListener('click', (event) => {
-        var clickX = event.offsetX;
-        var clickY = event.offsetY;
-        if(actions.placingF) {
-          placeFence(clickX, clickY);
-        }
-        else {
-          shoot(clickX, clickY);
-        }
-      });
-      c.addEventListener('touchstart', (event) => {
-        initiateDrag(event);
-      });
-      c.addEventListener('touchend', (event) => {
-        endDrag(event);
-      });
-      c.addEventListener('touchmove', (event) => {
-        dragging(event);
-      });
-      c.addEventListener('mousemove', (event) => {
-        actions.mouse = event;
-      });
-      document.addEventListener('keydown', (event) => {
-        const keyName = event.key;
-        if(keyName == "w") {
-          goUp();
-        }
-        if(keyName == "s") {
-          goDown();
-        }
-        if(keyName == "d") {
-          goRight();
-        }
-        if(keyName == "a") {
-          goLeft();
-        }
-        if(keyName == "f") {
-          actions.placingF = !actions.placingF;
-        }
-      });
-
-      var a = document.addEventListener('keyup', (event) => {
-        if(event.key == "w" || event.key == "s")
-          actions.act.up = 0;
-        if(event.key == "a" || event.key == "d")
-          actions.act.right = 0;
-      });
-      resolve(a);
-    });
-  },
+  assignListeners: assignListeners,
   performActions: performActions,
   act: {                           // actions
     up: 0,
@@ -282,7 +310,9 @@ var actions = {
     x: 0, y: 0
   },
   detectFlag: detectFlag,
-  drainFlag: {}
+  drainFlag: {},
+  aiActions: {},
+  proccessAI: processAI
 }
 
 module.exports = actions;

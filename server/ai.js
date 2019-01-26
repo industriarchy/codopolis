@@ -47,12 +47,13 @@ act = function(data) {
 
 function loadAi(id, db) {
   return new Promise( function(resolve) {
+    console.log("loading ai");
     const collection = db.get('ai');
     collection.findOne({ 'owner' : id }, {}, function(e,docs){
       if(e === null) {
         if(docs != null) {
           console.log("ai found", docs);
-          map.mapData.units[docs._id] = docs;
+          map.mapData.ai[docs._id] = docs;
           resolve(true);
         }
         else {
