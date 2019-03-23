@@ -94,8 +94,6 @@ function processMovement(theUnit) {
       theUnit.resetLoc = false;
     }
     else {
-      if(theUnit.ai)
-      // console.log("sending reset");
       theUnit.resetLoc = true;
     }
   }
@@ -238,6 +236,40 @@ function shoot(msg) {
   }
 }
 
+function aiShoot(ai) {
+  // first check timeout
+  if(map.mapData.ai[ai.id]) {
+    console.log("ai", ai);
+    if(map.mapData.ai[ai.id].timeout < 1) {
+
+      // Then look through missles
+      var keys = Object.keys(ai.missles);
+      for(var i=0;i<keys.length;i++){
+        var key = keys[i];
+        // if theres a new missle
+        if(ai.missles[key].shooting) {
+          // add the new missle to the json
+          map.mapData.curMId++;
+          let aMissle = {
+            sender: ai.id,
+            curX: map.mapData.ai[ai.id].x + 50,
+            curY: map.mapData.ai[ai.id].y + 50,
+            dX: ai.missles[key].dX,
+            dY: ai.missles[key].dY,
+            dist: 0,
+            type: ai.missles[key].type
+          };
+          map.mapData.missles[ai.id] = aMissle;
+          map.mapData.ai[ai.id].timeout = 30;
+        }
+      }
+    }
+    else {
+      map.mapData.ai[ai.id].timeout--;
+    }
+  }
+}
+
 function build(msg) {
   if(utils.validate(msg.unit.build)) {
     map.change(msg.unit.build.type, msg.unit.build.x, msg.unit.build.y);
@@ -259,4 +291,4 @@ function resetUnits() {
   }
 }
 
-module.exports = {processData: processData, shoot: shoot, build: build, resetUnits: resetUnits};
+module.exports = {processData: processData, shoot: shoot, aiShoot: aiShoot, build: build, resetUnits: resetUnits};

@@ -35,7 +35,7 @@ const formats = {
       loggedIn: true,
       damage: 20,
       maxSpeed: 20,
-      atkRange: 10,
+      atkRange: 100,
       atkSpeed: 1,
       program: ''
     }

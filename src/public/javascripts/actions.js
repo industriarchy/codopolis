@@ -68,20 +68,26 @@ function shoot(x2, y2) {
    type: "A",
    shooting: true
   };
- // console.log(outsideData.units[id]);
- // if(outsideData.units[id].missles != null && outsideData.units[id].missles != undefined) {
- //   console.log(outsideData.units[id].missles);
- //   while(outsideData.units[id].missles[i] != null) {
- //     i++;
- //   }
- // }
- // else {
- //   outsideData.units[id].missles = {};
- // }
- // outsideData.units[id].missles[i] = aMissle;
- // console.log(outsideData.units[id]);
- if(actions.missles[1] == undefined) {
-   actions.missles[1] = aMissle;
+ if(actions.missles[0] == undefined) {
+   actions.missles[0] = aMissle;
+  }
+};
+
+function aiShoot(ai, x2, y2) {
+  diff = utils.unit(ai.x, ai.y, x2, y2);
+  let i=0;
+  let aMissle = {
+   curX: ai.x+50,
+   curY: ai.y+50,
+   dX: diff.x * CONSTANTS.MISSLESPEED,
+   dY: diff.y * CONSTANTS.MISSLESPEED,
+   dist: 0,
+   type: "A",
+   shooting: true
+  };
+ if(ai.missles == undefined) {
+   ai.missles = {};
+   ai.missles[0] = aMissle;
   }
 };
 
