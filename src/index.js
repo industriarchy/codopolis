@@ -157,11 +157,11 @@ io.on('connection', function(socket){
           map.mapData.ai[ai.id].ll = ai.ll;
           map.mapData.ai[ai.id].loggedIn = true;
           if(ai.missles == undefined) {
-            console.log("missles undefined");
+            // console.log("missles undefined");
             map.mapData.ai[ai.id].missles = {};
           }
           else {
-            console.log("missles", ai.missles);
+            // console.log("missles", ai.missles);
             controller.aiShoot(ai);
           }
         }

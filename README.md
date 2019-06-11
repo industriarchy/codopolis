@@ -94,7 +94,7 @@ TODO:
 
 * Data needs to be validated so server never crashes
 * Dogs need to be added
- * basic following algorithm
+* basic following algorithm
 * Programming needs to be added to Dogs
 * Resources need to be added
 * Creeps need to be added
