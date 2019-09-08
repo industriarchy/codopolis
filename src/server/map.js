@@ -30,7 +30,11 @@ function readDBMap(db, mapName) {
   console.log("mapName: ", mapName);
   mapData.flags = [];
   collection.findOne({ 'name': mapName }, {}, function(e,docs){
-    setMap(docs.map);
+    if (docs && docs.map) {
+      setMap(docs.map);
+    } else {
+      console.log("Error: Map not found in database.");
+    }
   });
 }
 

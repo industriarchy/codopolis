@@ -2,34 +2,52 @@
 // ============================== SETUP ========================================
 // -----------------------------------------------------------------------------
 
-var docCookies = require('./cookies');
-var utils = require('./utility');
-var actions = require('./actions');
+import React, { useEffect } from 'react'
+import { utils } from '../Utility/utility.js';
+import actions from './actions';
 var model = require('./model');
-var render = require('./render');
+import { render } from './render'
+import openSocket from 'socket.io-client';
+import stillImg from '../../images/still.png';
+import stillFImg from '../../images/stillF.png';
+import dogImg from '../../images/dog.png';
 
-var c;
-var ctx;
-var socket = io();
-var outsideData;
-var mapSet = false;
+const tickLengthMs = 1000 / 30;
+let c;
+let ctx;
+let socket;
+let outsideData;
+let mapSet = false;
 let previousTick = Date.now();
 let actualTicks = 0;
-const tickLengthMs = 1000 / 30;
 let gameWon = {won: false};
 
-$( function() {
+export const GameView = () => {
+  useEffect(() => {
+    // Update the document title using the browser API
+    startGame();
+  });
+
+  return (
+    <div>
+    <div className="viewContainer">
+      <canvas id="theView" width="1100px" height="800px" onClick={actions.clickEvent}></canvas>
+    </div>
+    </div>
+  );
+};
+
+export const startGame = () => {
+  socket = openSocket('http://localhost:3000');
   c = document.getElementById("theView");
   ctx = c.getContext("2d");
   render.setCtx(ctx);
-  model.dude.src = '/static/images/still.png';
-  model.fDude.src = '/static/images/stillF.png';
+  model.dude.src = stillImg;
+  model.fDude.src = stillFImg;
   model.creeps.dog = new Image();
-  model.creeps.dog.src = '/static/images/dog.png';
-  model.id = docCookies.getItem('userId');
-  document.getElementById('user').innerHTML = model.id;
+  model.creeps.dog.src = dogImg;
+  model.id = JSON.parse(localStorage.getItem('user')).username;
   initiateSocket();
-
   actions.assignListeners(c).then( () => {
     listenSocket();
     socket.on('message', (msg) => {
@@ -37,7 +55,7 @@ $( function() {
     })
     gameLoop();
   });
-});
+};
 
 const gameLoop = () => {
   let now = Date.now();
@@ -95,7 +113,6 @@ function listenSocket() {
            missles: actions.missles, alive: true, build: actions.build, drainFlag: actions.drainFlag},
            ai: aiToSend(), mapSet: mapSet };
         socket.emit('appData', data);
-
         if(model.needsReset) {
           resetLoc();
         }

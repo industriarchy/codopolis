@@ -3,9 +3,10 @@
 // -----------------------------------------------------------------------------
 
 const model = require('./model');
-const utils = require('./utility');
+import { utils } from '../Utility/utility.js';
 const actions = require('./actions');
-const SharedConst = require('../../shared/constants.js');
+const SharedConst = require('../../../shared/constants.js');
+var docCookies = require('./cookies');
 let ctx;
 let outsideData;
 
@@ -71,7 +72,10 @@ function drawMap() {
   for(let i=leftBound(); i<rightBound(); i++) {
     for(let j=topBound(); j<bottomBound(); j++) {
       if(model.MAP[i][j].a == 1){
-        flag(i*100+x0, j*100+y0, '#f00', model.MAP[i][j].h);
+        let fColor = '#f00';
+        if(model.MAP[i][j].o == docCookies.getItem('userId'))
+          fColor = '#0f0';
+        flag(i*100+x0, j*100+y0, fColor, model.MAP[i][j].h);
       }
       else if(model.MAP[i][j].a == 2){
         smallTree(i*100+x0, j*100+y0);
@@ -286,7 +290,7 @@ function drawMissles() {
   if(model.missles != null) {
     var keys = Object.keys(model.missles);
     for(var j=0;j<keys.length;j++){
-      key = keys[j];
+      let key = keys[j];
       let missle = model.missles[key];
       ctx.beginPath();
       ctx.arc(missle.curX - model.X + 500, missle.curY - model.Y + 350, 5, 0, 2 * Math.PI, false);
@@ -371,7 +375,7 @@ function gameWon(win) {
   ctx.fillText("Reset in: " + parseInt(win.reset/(1000 / SharedConst.SPEED) + 1), 350, 400);
 };
 
-const render = {
+export const render = {
   setCtx: (ctxp) => {
     ctx = ctxp;
   },
@@ -384,5 +388,3 @@ const render = {
   renderIdle: renderIdle,
   gameWon: gameWon
 };
-
-module.exports = render;

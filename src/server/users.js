@@ -5,19 +5,26 @@ var map = require('./map.js');
 var uuidv1 = require('uuid/v1');
 var formats = require('../shared/formats');
 const utils = require('../server/utility');
+const { encrypt, decrypt } = require('./encrypt');
 
-router.post('/login/:email/:password', function(req, res) {
+router.post('/test', function(req, res) {
+  res.send('testing!');
+});
+
+router.post('/login', function(req, res) {
   var db = req.db;
   var collection = db.get('userlist');
-  var emailn = req.params.email;
-  var password = req.params.password;
-  collection.find({ 'email' : emailn }, {}, function(e,docs){
+  var emailn = req.body.email;
+  var password = req.body.password;
+  collection.findOne({ 'email' : emailn }, {}, function(e,docs){
     if(e === null) {
-      if(docs[0] != null) {
-        if(password == docs[0].password) {
+      if(docs != null) {
+        let decryptPW = decrypt(docs.password);
+        if(password == decryptPW) {
           console.log("password match");
-          req.session.user = docs[0].username;
-          res.send( docs[0] );
+          res.cookie('userId', docs.username);
+          // req.session.user = docs.username;
+          res.send( docs );
         }
         else {res.send( { msg: "x"} )}
       }
@@ -40,16 +47,17 @@ router.post('/adduser', function(req, res) {
   console.log(req.body);
   let collection = db.get('userlist');
   if( utils.validate(formats.newUser, req.body) ) {
+    console.log("format valid");
     checkUser(req.body.username, collection).then( (result) => {
       if (result) {
         let newUser = {};
         newUser.username = req.body.username;
         newUser.email = req.body.email;
-        newUser.password = req.body.password;
+        newUser.password = encrypt(req.body.password);
         newUser.char = Object.assign({}, formats.unit);
         console.log("new user", newUser);
         collection.insert(newUser, function(err, result){
-            req.session.user = req.body.username;
+            res.cookie('userId', req.body.username);
             res.send(
                 (err === null) ? { msg: '' } : { msg: err }
             );
@@ -59,6 +67,7 @@ router.post('/adduser', function(req, res) {
         ai.new(newAi, db);
       }
       else {
+        console.log('user already exists');
         res.send( { msg: 'already exists' } );
       }
     });
@@ -79,6 +88,16 @@ router.delete('/deleteuser/:id', function(req, res) {
         res.send((err === null) ? { msg: '' } : { msg:'error: ' + err });
     });
 });*/
+
+router.get('/getSession', function(req, res) {
+  console.log("cur session", req.session);
+  if (req.session.user) {
+    console.log("session found");
+    res.send({ user: req.session.user });
+  } else {
+    res.send({ error: 'User not found.' });
+  }
+});
 
 router.get('/getuser/:email', function(req, res) {
   console.log("hit getuser")

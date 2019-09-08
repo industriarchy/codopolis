@@ -103,27 +103,6 @@ function processMovement(theUnit) {
   }
 }
 
-// function processFlags() {
-//   flagDrains.map( (flag, i) => {
-//     // should verify here
-//     if (flag.flag) {
-//       if (flag.flag.health > 100) {
-//         return;
-//       } else {
-//         if (flag.flag.health < map.map[flag.flag.x][flag.flag.y].h) {
-//           map.map[flag.flag.x][flag.flag.y].h--;
-//         }
-//         else {
-//           map.map[flag.flag.x][flag.flag.y].h++;
-//         }
-//         map.mapData.flags[flag.id].owner = flag.flag.owner;
-//         map.mapData.flags[flag.id].health = map.map[flag.flag.x][flag.flag.y].h;
-//         map.map[flag.flag.x][flag.flag.y].o = flag.flag.owner;
-//       }
-//     }
-//   });
-// }
-
 function processFlags() {
   flagDrains.map( (flag, i) => {
     // should verify here
@@ -234,6 +213,7 @@ function isClear(tile) {
 
 function shoot(msg) {
   // first check timeout
+  // console.log("here", map.mapData.units, "id", msg.unit.id);
   if (map.mapData.units[msg.unit.id]) {
     if (map.mapData.units[msg.unit.id].timeout < 1) {
 
@@ -255,6 +235,7 @@ function shoot(msg) {
             type: msg.unit.missles[key].type
           };
           map.mapData.missles[map.mapData.curMId] = aMissle;
+          // console.log("Added missle", map.mapData.missles);
           map.mapData.units[msg.unit.id].timeout = 30;
         }
       }

@@ -46,3 +46,12 @@ body {
   margin-left: -550px;
   z-index: -1;
 }
+
+.field-error {
+  color: #f22;
+  padding-bottom: 10px;
+}
+
+.navbar-brand {
+  color: #FFF;
+}

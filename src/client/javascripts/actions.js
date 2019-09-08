@@ -10,7 +10,6 @@ const CONSTANTS = require('../../shared/constants.js');
 
 var mouse;
 var sX, sY, eX, eY;
-var socket = io();
 
 function goUp() {
   actions.act.up = model.s;
@@ -68,8 +67,8 @@ function shoot(x2, y2) {
    type: "A",
    shooting: true
   };
- if(actions.missles[0] == undefined) {
-   actions.missles[0] = aMissle;
+  if(actions.missles[0] == undefined) {
+    actions.missles[0] = aMissle;
   }
 };
 
@@ -239,22 +238,26 @@ const updatePet = (pet) => {
 }
 
 const addSelectOption = (option) => {
-  document.getElementById('petSelect').innerHTML += '<option>' + option + '</option>';
+  // document.getElementById('petSelect').innerHTML += '<option>' + option + '</option>';
 };
+
+const clickEvent = (event) => {
+  var clickX = event.offsetX;
+  var clickY = event.offsetY;
+  if(actions.placingF) {
+    placeFence(clickX, clickY);
+  }
+  else {
+    shoot(clickX, clickY);
+  }
+}
 
 const assignListeners = (c) => {
   return new Promise( function(resolve, reject) {
-    document.getElementById('logout').addEventListener('click', logout);
-    document.getElementById('assignCode').addEventListener('click', assignCode);
+    // document.getElementById('logout').addEventListener('click', logout);
+    // document.getElementById('assignCode').addEventListener('click', assignCode);
     c.addEventListener('click', (event) => {
-      var clickX = event.offsetX;
-      var clickY = event.offsetY;
-      if(actions.placingF) {
-        placeFence(clickX, clickY);
-      }
-      else {
-        shoot(clickX, clickY);
-      }
+      clickEvent(event);
     });
     c.addEventListener('touchstart', (event) => {
       initiateDrag(event);
@@ -299,6 +302,7 @@ const assignListeners = (c) => {
 
 // Export functions
 var actions = {
+  clickEvent,
   assignListeners: assignListeners,
   performActions: performActions,
   act: {                           // actions
