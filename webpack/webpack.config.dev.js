@@ -1,0 +1,65 @@
+const { resolve } = require('path')
+const webpack = require('webpack')
+const HtmlWebpackPlugin = require('html-webpack-plugin')
+const { WebpackPluginServe: Serve } = require('webpack-plugin-serve');
+
+module.exports = {
+  entry: [
+    'webpack-dev-server/client',
+    'webpack/hot/only-dev-server',
+    resolve(__dirname, 'hotReload'),
+  ],
+  output: {
+    filename: 'bundle.js',
+    path: resolve(__dirname),
+    publicPath: '/',
+  },
+  context: resolve(__dirname, '../src'),
+  devtool: 'inline-source-map',
+  devServer: {
+    hot: true,
+    host: '0.0.0.0',
+    contentBase: resolve(__dirname, '../assets'),
+    publicPath: '/',
+    historyApiFallback: true,
+    proxy: {
+      '/api': {
+        target: 'http://localhost',
+        secure: false,
+        changeOrigin: true
+      }
+    }
+  },
+  module: {
+    rules: [
+      {
+        test: /\.(js|jsx)$/,
+        include: [resolve(__dirname, '../src'), resolve(__dirname)],
+        use: 'babel-loader',
+      },
+      {
+        test:/\.(s*)css$/,
+        use:['style-loader','css-loader', 'sass-loader']
+      },
+      {
+        test: /\.(png|jp(e*)g|svg)$/,
+        use: [{
+            loader: 'url-loader',
+            options: {
+                limit: 8000, // Convert images < 8kb to base64 strings
+                name: 'images/[hash]-[name].[ext]'
+            }
+        }]
+      }
+    ],
+  },
+  plugins: [
+    new webpack.HotModuleReplacementPlugin(),
+    new webpack.NamedModulesPlugin(),
+    new HtmlWebpackPlugin({
+      title: 'codopolis',
+      template: '../webpack/template.html',
+    }),
+  ],
+  performance: { hints: false },
+}

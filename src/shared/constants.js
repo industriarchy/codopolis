@@ -1,0 +1,15 @@
+const SharedConst = {
+  UNITWIDTH: 60,
+  UNITHEIGHT:100,
+  SPEED: 45,
+  SAVEINTERVAL: 900,
+  WINPERCENTAGE: .6,
+  RESETINTERVAL: 222,
+  MISSLESPEED: 15,
+  MISSLEDIST: 30,
+  MAXSPEED: 30,
+  DRAINRANGE: 100,
+  DAMAGE: 30
+}
+
+module.exports = SharedConst;

@@ -94,9 +94,13 @@ TODO:
 
 * Data needs to be validated so server never crashes
 * Dogs need to be added
- * basic following algorithm
+* basic following algorithm
 * Programming needs to be added to Dogs
+* Saved scripts to preload
 * Resources need to be added
 * Creeps need to be added
 * Map needs to be made
 * Save on logouts and every 30 seconds?
+* Sidebar of flags
+
+Server is at 138.197.17.220
